@@ -10,8 +10,8 @@ A Python simulator for nonlinear dynamical systems with multiple agents and mult
 
 ### Install
 ```bash
-git clone https://github.com/cristian1928/Online-Adaptive-Deep-Residual-Neural-Network.git
-cd Online-Adaptive-Deep-Residual-Neural-Network
+git clone https://github.com/cristian1928/Multi-Agent-Multi-Target-Tracking.git
+cd Multi-Agent-Multi-Target-Tracking
 
 python3 -m venv venv
 source venv/bin/activate
