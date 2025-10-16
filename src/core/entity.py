@@ -1,0 +1,63 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, List, Optional
+
+import numpy as np
+from numpy.typing import NDArray
+
+from ..simulation import dynamics
+from ..simulation.integrate import integrate_step
+
+
+class Entity:
+    def __init__(self, initial_position: NDArray[np.float64], time_steps: int, config: dict[str, Any]) -> None:
+        self.id: str = config['id']
+        self.num_states: int = config['num_states']
+        self.time_step_delta: float = config['time_step_delta']
+        self.positions: NDArray[np.float64] = np.zeros((self.num_states, time_steps))
+        self.velocities: NDArray[np.float64] = np.zeros((self.num_states, time_steps))
+        self.positions[:, 0] = initial_position
+        dynamics_type = config['dynamics_type']
+        self.dynamics_function: Callable[[NDArray[np.float64]], NDArray[np.float64]] = dynamics.get_dynamics_function(dynamics_type)
+        self.control_output: NDArray[np.float64] = np.zeros(self.num_states)
+        self.synchronization_error: NDArray[np.float64] = np.zeros(self.num_states)
+        self.neighbors: List["Entity"] = []
+
+    def update_dynamics(self, step: int) -> None:
+        def dynamics_with_control(t: float, pos: NDArray[np.float64]) -> NDArray[np.float64]:
+            return self.dynamics_function(pos) + self.control_output
+        self.velocities[:, step] = self.dynamics_function(self.positions[:, step - 1]) + self.control_output
+        result = integrate_step(self.positions[:, step - 1], step, self.time_step_delta, dynamics_with_control)
+        self.positions[:, step] = result
+
+
+class Agent(Entity):
+    def __init__(self, initial_position: NDArray[np.float64], time_steps: int, config: dict[str, Any], targets: List["Target"], pin_row: Optional[NDArray[np.float64]] = None) -> None:
+        super().__init__(initial_position, time_steps, config)
+        self.targets: List["Target"] = targets
+        self.pin_row: NDArray[np.float64] = np.zeros(0, dtype=np.float64)
+        self.k1: float = config['agents_proportional_gain']
+
+    def compute_control_output(self, step: int) -> None:
+        position = self.positions[:, step - 1]
+        neighborhood_consensus_term = np.zeros(self.num_states)
+        for neighbor in self.neighbors:
+            neighborhood_consensus_term += neighbor.positions[:, step - 1] - position
+        target_consensus_term = np.zeros(self.num_states)
+        if len(self.targets) and self.pin_row.size:
+            for index, weight in enumerate(self.pin_row):
+                if weight != 0.0:
+                    target_consensus_term += weight * (self.targets[index].positions[:, step - 1] - position)
+        self.synchronization_error = target_consensus_term + neighborhood_consensus_term
+        self.control_output = self.k1 * self.synchronization_error
+
+
+class Target(Entity):
+    def __init__(self, initial_position: NDArray[np.float64], time_steps: int, config: dict[str, Any]) -> None:
+        super().__init__(initial_position, time_steps, config)
+        self.k1: float = config['targets_proportional_gain']
+
+    def compute_control_output(self, step: int) -> None:
+        self.synchronization_error = np.zeros(self.num_states)
+        self.control_output = np.zeros(self.num_states)

@@ -1,0 +1,10 @@
+/simulation_data
+/__pycache__
+*.pyc
+*.pyo
+*.pyd
+/.pytest_cache
+src/.DS_Store
+.DS_Store
+venv
+.vscode
