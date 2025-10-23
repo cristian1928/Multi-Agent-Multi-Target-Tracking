@@ -89,6 +89,24 @@ def custom(state: NDArray[np.float64]) -> NDArray[np.float64]:
     """
     return np.zeros_like(state, dtype=np.float64)
 
+
+######## def figure 8 ##########
+
+def f8_dynamics(time: float) -> NDArray[np.float64]:
+
+    '''Figure-8 trajectory dynamics'''
+
+    A: float     = 10      # Amplitude in x-direction
+    B: float     = 10        # Amplitude in y-direction
+    a: float     = 1      # Frequency in x-direction
+    b: float     = 2        # Frequency in y-direction
+    delta: float = np.pi/2  # Phase shift
+
+    xdot: float = A*a*np.cos(a*time + delta)
+    ydot: float = B*b*np.cos(b*time)
+    zdot: float = 0
+    return np.array([xdot, ydot, zdot], dtype=np.float64)
+
 # ---------------------------------------------------------------------
 def get_dynamics_function(dynamics_type: str) -> Callable[[NDArray[np.float64]], NDArray[np.float64]]:
     """Return the dynamics function associated with `dynamics_type`."""
@@ -110,3 +128,4 @@ def get_initial_conditions(dynamics_type: str) -> List[float]:
         "custom": [0.0, 0.0, 0.0],
     }
     return initial_conditions_map[dynamics_type]
+

@@ -1,5 +1,5 @@
 {
-  "final_time": 120,
+  "final_time": 360,
   "time_step_delta": 0.01,
   "seed": 0,
 
@@ -14,9 +14,10 @@
     { "id": "A8", "dynamics_type": "trophic_dynamics", "initial_position": [ 8.5, -3.0,  0.8], "num_states": 3 }],
   
   "targets": [
-    {"id": "T1", "dynamics_type": "trophic_dynamics", "initial_position": [40.0, 9.0, 2.0], "num_states": 3 },
-    {"id": "T2", "dynamics_type": "trophic_dynamics", "initial_position": [60.0, 5.0, 3.0], "num_states": 3 },
-    {"id": "T3", "dynamics_type": "trophic_dynamics", "initial_position": [30.0, 2.5, 1.5], "num_states": 3 }],
+    {"id": "T1", "dynamics_type": "trophic_dynamics", "tracking_type": "f8_dynamics", "initial_position": [40.0, 9.0, 2.0], "num_states": 3 },
+    {"id": "T2", "dynamics_type": "trophic_dynamics", "tracking_type": "f8_dynamics", "initial_position": [60.0, 5.0, 3.0], "num_states": 3 },
+    {"id": "T3", "dynamics_type": "trophic_dynamics", "tracking_type": "f8_dynamics", "initial_position": [30.0, 2.5, 1.5], "num_states": 3 }
+  ],
 
   "agent_edge_set": [[1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8]],
 
