@@ -67,8 +67,8 @@ class Agent(Entity):
         # sum these vectors to get neighborhood consensus term
 
         for neighbor in self.neighbors:
-            neighborhood_consensus_term += (neighbor.positions[:, step - 1] - position + neighbor.offsets) # computes position difference with each neighbor, i.e. the neighborhood consensus error
-        target_consensus_term = np.zeros(self.num_states)
+            neighborhood_consensus_term += (neighbor.positions[:, step - 1] - position) + neighbor.offsets # computes position difference with each neighbor, i.e. the neighborhood consensus error
+        #target_consensus_term = np.zeros(self.num_states)
 
         # self.pin.row is a row vector from pinning matrix, e.g. [0, 1, 1] for agent 2
         # each 1 means the agent is connected to that target, so for agent 2, it is connected to target 1 and target 2
@@ -81,16 +81,17 @@ class Agent(Entity):
                 # target consensus term measure show far an agent is from its pinned targets at the previous time step and in what direction it needs to move to reduce that difference
                     # pulls agents i toward the pinned target
 
+        target_consensus_term = np.zeros(self.num_states)
         if len(self.targets) and self.pin_row.size: 
-            for index, weight in enumerate(self.pin_row):
+            for index, weight in enumerate(self.pin_row[:len(self.targets)]):
                 if weight != 0.0: 
-                    target_consensus_term += weight * (self.targets[index].positions[:, step - 1] - position)
+                    target_consensus_term += weight * (self.targets[index].positions[:, step - 1] - position) + neighbor.offsets
 
         # neighborhood consensus term ensures agents stay together 
         # target consensus term ensures agents follow targets
         # total error between target consensus term and neighborhood consensus term ensures agents stay in consensus with its neighbords and follow targets
 
-        self.synchronization_error = target_consensus_term + neighborhood_consensus_term
+        self.synchronization_error = neighborhood_consensus_term + target_consensus_term
         self.control_output = self.k1 * self.synchronization_error
 
 class Target(Entity):
@@ -110,7 +111,7 @@ class Target(Entity):
         neighborhood_consensus_term = np.zeros(self.num_states)
 
         for neighbor in self.neighbors:
-            neighborhood_consensus_term += (neighbor.positions[:, step - 1] - position + neighbor.offsets)
+            neighborhood_consensus_term += (neighbor.positions[:, step - 1] - position) + neighbor.offsets
 
         self.synchronization_error = neighborhood_consensus_term 
         self.control_output = self.k1 * self.synchronization_error + desired_velocity

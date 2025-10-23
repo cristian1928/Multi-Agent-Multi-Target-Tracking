@@ -6,6 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 # ---------------------------------------------------------------------
+
 def attitude_mrp(state: NDArray[np.float64]) -> NDArray[np.float64]:
     """
     Rigid-body attitude kinematics in Modified Rodrigues Parameters.
@@ -34,6 +35,7 @@ def attitude_mrp(state: NDArray[np.float64]) -> NDArray[np.float64]:
     return r_dot
 
 # ---------------------------------------------------------------------
+
 def chua(state: NDArray[np.float64]) -> NDArray[np.float64]:
     """
     Dimensionless Chua double-scroll circuit.
@@ -58,6 +60,7 @@ def chua(state: NDArray[np.float64]) -> NDArray[np.float64]:
     return np.array([x_dot, y_dot, z_dot], dtype=np.float64)
 
 # ---------------------------------------------------------------------
+
 def trophic_dynamics(state: NDArray[np.float64]) -> NDArray[np.float64]:
     """
     Three-tier ecological food chain.
@@ -82,6 +85,7 @@ def trophic_dynamics(state: NDArray[np.float64]) -> NDArray[np.float64]:
     return np.array([h_dot, p_dot, t_dot], dtype=np.float64)
 
 # ---------------------------------------------------------------------
+
 def custom(state: NDArray[np.float64]) -> NDArray[np.float64]:
     """
     Placeholder user-defined dynamics.
@@ -97,7 +101,7 @@ def f8_dynamics(time: float) -> NDArray[np.float64]:
     '''Figure-8 trajectory dynamics'''
 
     A: float     = 10      # Amplitude in x-direction
-    B: float     = 10        # Amplitude in y-direction
+    B: float     = 5        # Amplitude in y-direction
     a: float     = 1      # Frequency in x-direction
     b: float     = 2        # Frequency in y-direction
     delta: float = np.pi/2  # Phase shift
@@ -108,6 +112,12 @@ def f8_dynamics(time: float) -> NDArray[np.float64]:
     return np.array([xdot, ydot, zdot], dtype=np.float64)
 
 # ---------------------------------------------------------------------
+
+def none(time: float) -> NDArray[np.float64]:
+    return np.zeros(3, dtype=np.float64)
+
+#---------------------------------------------------------------------
+
 def get_dynamics_function(dynamics_type: str) -> Callable[[NDArray[np.float64]], NDArray[np.float64]]:
     """Return the dynamics function associated with `dynamics_type`."""
     dynamics_map: Dict[str, Callable[[NDArray[np.float64]], NDArray[np.float64]]] = {
@@ -119,13 +129,17 @@ def get_dynamics_function(dynamics_type: str) -> Callable[[NDArray[np.float64]],
     return dynamics_map[dynamics_type]
 
 # ---------------------------------------------------------------------
-def get_initial_conditions(dynamics_type: str) -> List[float]:
-    """Return a list of reasonable initial conditions for the chosen model."""
-    initial_conditions_map: Dict[str, List[float]] = {
-        "attitude_mrp": [0.25, 0.10, -0.30],      # unitless
-        "chua": [0.2, 0.0, 0.0],                  # unitless
-        "trophic_dynamics": [40.0, 9.0, 2.0],     # individuals
-        "custom": [0.0, 0.0, 0.0],
+
+def get_dynamics_function(dynamics_type: str) -> Callable:
+    """Return the dynamics function associated with `dynamics_type`."""
+    dynamics_map: Dict[str, Callable] = {
+        "attitude_mrp": attitude_mrp,
+        "chua": chua,
+        "trophic_dynamics": trophic_dynamics,
+        "custom": custom,
+        "f8_dynamics": f8_dynamics,
+        "none": none,    
     }
+
     return initial_conditions_map[dynamics_type]
 
