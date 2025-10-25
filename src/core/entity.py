@@ -76,7 +76,7 @@ class Target(Entity):
     def compute_control_output(self, step: int) -> None:
         # Target maintains its own dynamics (can be stationary or moving)
         time = step * self.time_step_delta
-        desired_velocity = dynamics.none(time) if hasattr(dynamics, 'none') else np.zeros(self.num_states)
+        desired_velocity = dynamics.f8_dynamics(time) if hasattr(dynamics, 'f8_dynamics') else np.zeros(self.num_states)
         
         # Target can also have consensus with other targets if needed
         neighborhood_consensus_term = np.zeros(self.num_states)
