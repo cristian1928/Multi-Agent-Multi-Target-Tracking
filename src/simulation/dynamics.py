@@ -62,6 +62,7 @@ def chua(state: NDArray[np.float64]) -> NDArray[np.float64]:
 # ---------------------------------------------------------------------
 
 def trophic_dynamics(state: NDArray[np.float64]) -> NDArray[np.float64]:
+
     """
     Three-tier ecological food chain.
 
@@ -100,7 +101,7 @@ def f8_dynamics(time: float) -> NDArray[np.float64]:
 
     '''Figure-8 trajectory dynamics'''
 
-    A: float     = 10      # Amplitude in x-direction
+    A: float     = 10     # Amplitude in x-direction
     B: float     = 5        # Amplitude in y-direction
     a: float     = 1      # Frequency in x-direction
     b: float     = 2        # Frequency in y-direction
@@ -125,21 +126,20 @@ def get_dynamics_function(dynamics_type: str) -> Callable[[NDArray[np.float64]],
         "chua": chua,
         "trophic_dynamics": trophic_dynamics,
         "custom": custom,
+        "none": none,
     }
     return dynamics_map[dynamics_type]
 
 # ---------------------------------------------------------------------
-
-def get_dynamics_function(dynamics_type: str) -> Callable:
-    """Return the dynamics function associated with `dynamics_type`."""
-    dynamics_map: Dict[str, Callable] = {
-        "attitude_mrp": attitude_mrp,
-        "chua": chua,
-        "trophic_dynamics": trophic_dynamics,
-        "custom": custom,
-        "f8_dynamics": f8_dynamics,
-        "none": none,    
+def get_initial_conditions(dynamics_type: str) -> List[float]:
+    """Return a list of reasonable initial conditions for the chosen model."""
+    initial_conditions_map: Dict[str, List[float]] = {
+        "attitude_mrp": [0.25, 0.10, -0.30],      # unitless
+        "chua": [0.2, 0.0, 0.0],                  # unitless
+        "trophic_dynamics": [40.0, 9.0, 2.0],     # individuals
+        "custom": [0.0, 0.0, 0.0],
+        "none": [0.0, 0.0, 0.0],
     }
-
     return initial_conditions_map[dynamics_type]
+
 
