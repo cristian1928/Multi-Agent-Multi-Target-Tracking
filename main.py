@@ -162,28 +162,59 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
 
 #---------------------------------------------------------------
 
-    agent_ids  = [conf.get("id", f"A{i+1}") for (_, conf) in agent_specs]
-    target_ids = [conf.get("id", f"T{j+1}") for (_, conf) in target_specs]
 
-    A_xy = np.array([ag.positions[:2, -1] for ag in agents]) if agents else np.empty((0, 2))
-    T_xy = np.array([tg.positions[:2, -1] for tg in targets]) if targets else np.empty((0, 2))
 
-    fig1, ax1 = plt.subplots(figsize=(6,6))
-    if A_xy.size:
-        ax1.scatter(A_xy[:, 0], A_xy[:, 1], s=100, label="Agents", marker="o", color="blue")
-        for (x, y), lab in zip(A_xy, agent_ids):
-            ax1.annotate(lab, (x, y), xytext=(5, 5), textcoords="offset points")
-    if T_xy.size:
-        ax1.scatter(T_xy[:, 0], T_xy[:, 1], s=100, label="Target", marker="o", color="red")
-        for (x, y), lab in zip(T_xy, target_ids):
-            ax1.annotate(lab, (x, y), xytext=(5, 5), textcoords="offset points")
+    fig1, ax1 = plt.subplots(figsize=(8, 8))
+    step_skip = 10  # adjust for smoother or more discrete visualization
+
+    # --- Plot agent trajectories ---
+    for i, agent in enumerate(agents):
+        traj = agent.positions[:2, :]
+        x, y = traj[0, ::step_skip], traj[1, ::step_skip]
+        color = "black"  # All agents in black
+
+        # Discrete points + matching dashed path
+        ax1.plot(x, y, linestyle="--", color=color, alpha=0.8, linewidth=1.8)
+        ax1.scatter(x, y, s=25, color=color, alpha=0.6, label=f"Agent {i+1}" if i == 0 else "")
+
+        # Start and end points
+        ax1.scatter(traj[0, 0], traj[1, 0], s=70, marker="s", color=color, edgecolor="darkgray", zorder=5)
+        ax1.scatter(traj[0, -1], traj[1, -1], s=100, marker="o", color=color, edgecolor="darkgray", zorder=6)
+        ax1.text(traj[0, -1] + 0.1, traj[1, -1] + 0.1, f"A{i+1}", fontsize=9, color=color)
+
+    # --- Plot target trajectories ---
+    for j, target in enumerate(targets):
+        traj = target.positions[:2, :]
+        x, y = traj[0, ::step_skip], traj[1, ::step_skip]
+        t_color = "red"  # All targets in red
+
+        ax1.plot(x, y, linestyle="--", color=t_color, linewidth=2.0, alpha=0.8)
+        ax1.scatter(x, y, s=35, color=t_color, alpha=0.7, label=f"Target {j+1}" if j == 0 else "")
+
+        # Start and end
+        ax1.scatter(traj[0, 0], traj[1, 0], s=90, marker="P", color=t_color, edgecolor="darkred", zorder=6)
+        ax1.scatter(traj[0, -1], traj[1, -1], s=140, marker="o", color=t_color, edgecolor="darkred", zorder=7)
+        ax1.text(traj[0, -1] + 0.1, traj[1, -1] + 0.1, f"T{j+1}", fontsize=10, color=t_color)
+
+    # --- Formatting ---
     ax1.axis("equal")
-    ax1.set_xlabel("x")
-    ax1.set_ylabel("y")
-    ax1.set_title("Agent Formation Around Target")
+    ax1.set_xlabel("x", fontsize=12)
+    ax1.set_ylabel("y", fontsize=12)
+    ax1.set_title("Agent Formation", fontsize=14, weight="bold")
     ax1.grid(True, linestyle="--", alpha=0.4)
-    ax1.legend()
+    
+    # Add legend entries for agents and targets (only one entry each)
+    '''ax1.plot([], [], linestyle="--", color="black", linewidth=1.8, label="Agents")
+    ax1.plot([], [], linestyle="--", color="red", linewidth=2.0, label="Targets")
+    ax1.legend(loc="upper right", fontsize=9)'''
+    
+    plt.tight_layout()
     plt.show(block=False)
+
+
+
+
+
 
 #---------------------------------------------------------------
 
