@@ -53,34 +53,23 @@ def make_offsets(agent_specs: list[tuple[np.ndarray, dict]],
     if target_specs and N >= 3:
         target_pos = target_specs[0][0]
         agent_positions = np.array([spec[0] for spec in agent_specs])
-        
-        # Use first two agents to determine side length l
         l = np.linalg.norm(agent_positions[1] - agent_positions[0])
         
-        # Define relative formation vectors δ(i,j) for triangle
         triangle_vertices = [
-            np.array([0,     l/np.sqrt(3),     0]),       # top vertex relative to triangle center
-            np.array([l/2,  -l*np.sqrt(3)/6,   0]),      # bottom right relative to triangle center
-            np.array([-l/2, -l*np.sqrt(3)/6,   0])       # bottom left relative to triangle center
+            np.array([0,     l/np.sqrt(3),     0]),   
+            np.array([l/2,  -l*np.sqrt(3)/6,   0]),      
+            np.array([-l/2, -l*np.sqrt(3)/6,   0])       
         ]
         
-        # Center the triangle so geometric center is at the target
-        triangle_vertices = np.array(triangle_vertices)
-        centroid = np.mean(triangle_vertices, axis=0)
-        triangle_vertices_centered = triangle_vertices - centroid
-        desired_positions = [target_pos + vertex for vertex in triangle_vertices_centered]
-
-        # Desired absolute positions around target
-        desired_positions = [target_pos + v for v in triangle_vertices_centered]
-        
-        # Calculate offsets (same as before)
+        desired_positions = [target_pos + vertex for vertex in triangle_vertices]
+    
         for i in range(N):
             for j in neighbors[i]:
                 if i < j:
                     delta_ij = desired_positions[j] - desired_positions[i]
                     agent_offsets[:, i] += delta_ij
                     agent_offsets[:, j] -= delta_ij
-
+                    
         print("=== Inter-Agent Distances ===")
         for i in range(N):
             for j in range(i + 1, N):
