@@ -109,7 +109,7 @@ def f8_dynamics(time: float) -> NDArray[np.float64]:
 
     xdot: float = A*a*np.cos(a*time + delta)
     ydot: float = B*b*np.cos(b*time)
-    zdot: float = 0
+    zdot: float = 0 # t = step*delta(t), a cos(wt)
     return np.array([xdot, ydot, zdot], dtype=np.float64)
 
 # ---------------------------------------------------------------------

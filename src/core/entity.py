@@ -71,17 +71,20 @@ class Target(Entity):
     def __init__(self, initial_position: NDArray[np.float64], time_steps: int, config: dict[str, Any]) -> None:
         super().__init__(initial_position, time_steps, config)
         self.k1: float = config['targets_proportional_gain']
-        # Target offset remains zero - it defines the formation center
+        # Target offset defines desired position in formation
 
     def compute_control_output(self, step: int) -> None:
-        # Target maintains its own dynamics (can be stationary or moving)
         time = step * self.time_step_delta
         desired_velocity = dynamics.none(time) if hasattr(dynamics, 'none') else np.zeros(self.num_states)
-        
-        # Target can also have consensus with other targets if needed
+
+    # Formation-aware neighborhood consensus: ∑[(q_j + δ_j) - (q_i + δ_i)]
         neighborhood_consensus_term = np.zeros(self.num_states)
         for neighbor in self.neighbors:
-            neighborhood_consensus_term += neighbor.positions[:, step - 1] - self.positions[:, step - 1]
-        
+            if isinstance(neighbor, Target):
+                neighbor_total = neighbor.positions[:, step - 1] + neighbor.offsets
+                self_total = self.positions[:, step - 1] + self.offsets
+                neighborhood_consensus_term += neighbor_total - self_total
+
+    # Combine consensus with internal dynamics
         self.synchronization_error = neighborhood_consensus_term
         self.control_output = self.k1 * self.synchronization_error + desired_velocity

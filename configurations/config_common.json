@@ -2,25 +2,15 @@
   "final_time": 150,
   "time_step_delta": 0.01,
   "seed": 0,
-
-  "agents": [
-    { "id": "A1", "dynamics_type": "none", "initial_position": [-8.0,  3.0,  1.5], "num_states": 3 },
-    { "id": "A2", "dynamics_type": "none", "initial_position": [-6.5, -2.0,  0.5], "num_states": 3 },
-    { "id": "A3", "dynamics_type": "none", "initial_position": [-5.0,  1.2,  2.2], "num_states": 3 }
-  ],
   
   "targets": [
-    {"id": "T1", "dynamics_type": "none", "tracking_type": "none", "initial_position": [40.0, 9.0, 2.0], "num_states": 3 }],
-
-  "agent_edge_set": [[1, 2], [2, 3], [3,1]],
-
-  "target_edge_set": [],
-
-  "pinning_matrix": [
-    [0],
-    [1],
-    [0]
+    {"id": "T1", "dynamics_type": "none", "tracking_type": "f8_dynamics", "initial_position": [40.0, 9.0, -2.0], "num_states": 3 },
+    {"id": "T2", "dynamics_type": "none", "tracking_type": "f8_dynamics", "initial_position": [60.0, 5.0, -3.0], "num_states": 3 },
+    {"id": "T3", "dynamics_type": "none", "tracking_type": "f8_dynamics", "initial_position": [35.0, 3.0, -8.0], "num_states": 3 },
+    {"id": "T4", "dynamics_type": "none", "tracking_type": "f8_dynamics", "initial_position": [43.0, 8.0, -6.0], "num_states": 3 }
   ],
+
+  "target_edge_set": [[1,2],[2,3],[1,3],[1,4],[2,4],[3,4]],
 
   "agents_proportional_gain": 10,
   "targets_proportional_gain": 10
