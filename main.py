@@ -48,7 +48,7 @@ def construct_undirected_neighborhood_set(entities: list[Any], edge_set: list[li
 #                         time_steps: int,
 #                         base_config: dict[str, Any],
 #                         neighbors: list[list[int]]) -> np.ndarray:
-#
+# #
 #     nd = int(agent_specs[0][1]['num_states'])
 #     N = len(agent_specs)
 #     agent_offsets = np.zeros((nd, N))
@@ -58,7 +58,7 @@ def construct_undirected_neighborhood_set(entities: list[Any], edge_set: list[li
 #         target_pos_2 = target_specs[1][0]
 #         agent_positions = np.array([spec[0] for spec in agent_specs])
 #         l = np.linalg.norm(agent_positions[1] - agent_positions[0])
-#
+# #
 #         tri_formation = [
 #             np.array([0, l/np.sqrt(3), 0]),
 #             np.array([l/2, -l*np.sqrt(3)/6, 0]),
@@ -67,7 +67,7 @@ def construct_undirected_neighborhood_set(entities: list[Any], edge_set: list[li
 #
 #         desired_positions_1 = [target_pos_1 + vertex for vertex in tri_formation]
 #         desired_positions_2 = [target_pos_2 + vertex for vertex in tri_formation]
-#
+# #
 #         for i in range(3):
 #             for j in neighbors[i]:
 #                 if i < j:
@@ -106,14 +106,15 @@ def make_offsets_targets(target_specs: list[tuple[np.ndarray, dict]],
 
         target_positions = np.array([spec[0] for spec in target_specs])
         d = np.linalg.norm(target_positions[1] - target_positions[0])
-        h = np.sqrt(6)*d/3
-        
+        h = np.sqrt(6) * d / 3
+
         tet_formation = [
-        np.array([0, 0, 0]),
-        np.array([d, 0, 0]),
-        np.array([d/2, np.sqrt(3)*d/2, 0]),
-        np.array([d/2, np.sqrt(3)*d/6, h])
+            np.array([0, 0, 0]),
+            np.array([d, 0, 0]),
+            np.array([d / 2, np.sqrt(3) * d / 2, 0]),
+            np.array([d / 2, np.sqrt(3) * d / 6, h])
         ]
+
         desired_positions_1 = [target_pos_1 + vertex for vertex in tet_formation]
         desired_positions_2 = [target_pos_2 + vertex for vertex in tet_formation]
         desired_positions_3 = [target_pos_3 + vertex for vertex in tet_formation]
@@ -121,12 +122,13 @@ def make_offsets_targets(target_specs: list[tuple[np.ndarray, dict]],
 
         for i in range(4):
             for j in neighbors[i]:
-                if i < j and j < 4: 
+                if i < j and j < 4:
                     delta_ij_1 = desired_positions_1[j] - desired_positions_1[i]
-                    target_offsets[:, i] += delta_ij_1
-                    target_offsets[:, j] -= delta_ij_1
+                    target_offsets[:, i] += delta_ij_1/4
+                    target_offsets[:, j] -= delta_ij_1/4
 
     return target_offsets
+
 
 # ---------------------------------------------------------------
 
@@ -175,7 +177,6 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
         for pos, conf in target_specs
     ]
 
-
     # Assign offsets
     for i, target in enumerate(targets):
         target.offsets = target_offsets[:, i]
@@ -204,7 +205,7 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
             target.update_dynamics(step)
 
         simulation_time: float = step * time_step_delta
-        
+
         # --- FIX 2: Uncommented this line ---
         # This now saves the state (empty agents list, and your targets)
         save_state_to_csv(step, simulation_time, agents, targets)
@@ -216,20 +217,22 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
 
 # ---------------------------------------------------------------
 
-    fig1, ax1 = plt.subplots(figsize=(8, 6), subplot_kw={'projection': '3d'})
-    
+    # Create a 2D plot
+    fig1, ax1 = plt.subplots(figsize=(8, 8))  # square aspect
+
     # Get target IDs for labeling
     target_ids = [conf.get("id", f"T{j+1}") for (_, conf) in target_specs]
 
     # --- Find when formation is reached ---
     formation_reached_step = time_steps - 1  # Default to end if not found
     formation_threshold = 0.1  # Adjust this threshold as needed
-    
+
     for step in range(time_steps):
         if step % 10 == 0:  # Check every 10 steps for efficiency
             # Check if tetrahedral formation is reached
             formation_achieved = True
             for target in targets:
+                # Using all states for movement check, assuming 3D dynamics
                 current_pos = target.positions[:3, step]
                 if step < time_steps - 1:
                     next_pos = target.positions[:3, step + 1]
@@ -237,83 +240,84 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
                     if movement > formation_threshold:
                         formation_achieved = False
                         break
-            
+
             if formation_achieved:
                 formation_reached_step = step
                 break
 
     # --- Plot targets up to formation_reached_step ---
     step_skip = 5  # Reduced for smoother trajectories
-    
+
     for j, target in enumerate(targets):
-        # Extract X, Y, and Z data (first 3 states) up to formation step
-        traj = target.positions[:3, :formation_reached_step + 1]
-        x_full, y_full, z_full = traj[0, :], traj[1, :], traj[2, :]
-        x, y, z = x_full[::step_skip], y_full[::step_skip], z_full[::step_skip]
+        # Extract X and Y data (first 2 states) up to formation step
+        traj = target.positions[:2, :formation_reached_step + 1]
+        x_full, y_full = traj[0, :], traj[1, :]
+        x, y = x_full[::step_skip], y_full[::step_skip]
 
         t_color = "red"
-        # Plot 3D trajectory up to formation - thicker and more visible (no label)
-        ax1.plot(x_full, y_full, z_full, linestyle="-", color=t_color, alpha=0.8, linewidth=2.0)
-        # Scatter 3D points up to formation - larger and more visible
-        ax1.scatter(x, y, z, s=30, color=t_color, alpha=0.8, marker="o")
-        # Plot 3D start point - larger and distinct
+        # Plot 2D trajectory up to formation
+        ax1.plot(x_full, y_full, linestyle="-", color=t_color, alpha=0.8, linewidth=2.0)
+        # Scatter 2D points up to formation
+        # ax1.scatter(x, y, s=30, color=t_color, alpha=0.8, marker="o")
+        # Plot 2D start point
         start_label = "Start" if j == 0 else ""
-        ax1.scatter(x_full[0], y_full[0], z_full[0], s=80, marker="s", color=t_color, edgecolor="darkred", linewidth=1.5, zorder=6, label=start_label)
-        # Plot 3D formation point (where formation is reached) - circle instead of star
+        ax1.scatter(x_full[0], y_full[0], s=80, marker="s", color=t_color,
+                    edgecolor="darkred", linewidth=1.5, zorder=6, label=start_label)
+        # Plot 2D formation point (where formation is reached)
         formation_label = "Final Position" if j == 0 else ""
-        ax1.scatter(x_full[-1], y_full[-1], z_full[-1], s=100, marker="o", color=t_color, edgecolor="darkred", linewidth=1.5, zorder=7, label=formation_label)
-        
+        ax1.scatter(x_full[-1], y_full[-1], s=100, marker="o", color=t_color,
+                    edgecolor="darkred", linewidth=1.5, zorder=7, label=formation_label)
+
         # Add small black dashed line between start and final position for each target
-        ax1.plot([x_full[0], x_full[-1]], [y_full[0], y_full[-1]], [z_full[0], z_full[-1]], 
+        ax1.plot([x_full[0], x_full[-1]], [y_full[0], y_full[-1]],
                 'k--', alpha=0.6, linewidth=1.0)
 
-    # Get final positions for axis limits (up to formation step)
-    T_xyz = np.array([tg.positions[:3, formation_reached_step] for tg in targets]) if targets else np.empty((0, 3))
+    # Get final positions for drawing edges (still useful)
+    T_xy = np.array([tg.positions[:2, formation_reached_step] for tg in targets]) if targets else np.empty((0, 2))
 
-    # --- Formatting ---
-    # Create cubic axes for equal aspect ratio
-    if T_xyz.size:
-        x_min, x_max = T_xyz[:, 0].min(), T_xyz[:, 0].max()
-        y_min, y_max = T_xyz[:, 1].min(), T_xyz[:, 1].max()
-        z_min, z_max = T_xyz[:, 2].min(), T_xyz[:, 2].max()
-        
-        # Pad limits a bit (reduced padding)
-        x_range = x_max - x_min
-        y_range = y_max - y_min
-        z_range = z_max - z_min
-        
-        padding_factor = 0.08  # Reduced from 0.15
+    # --- Formatting (updated to include initial + trajectory extents) ---
+    # Collect ALL (x,y) points up to formation_reached_step so nothing is off-screen
+    xy_points = []
+    for tg in targets:
+        traj_xy = tg.positions[:2, :formation_reached_step + 1]  # shape (2, T)
+        xy_points.append(traj_xy.T)  # shape (T, 2)
+
+    if xy_points:
+        P = np.vstack(xy_points)  # shape (K, 2)
+        x_min, y_min = P.min(axis=0)
+        x_max, y_max = P.max(axis=0)
+
+        # Pad limits a bit
+        padding_factor = 0.10
+        x_range = max(x_max - x_min, 1e-9)
+        y_range = max(y_max - y_min, 1e-9)
         x_min -= x_range * padding_factor
         x_max += x_range * padding_factor
         y_min -= y_range * padding_factor
         y_max += y_range * padding_factor
-        z_min -= z_range * padding_factor
-        z_max += z_range * padding_factor
 
-        # Determine the overall maximum range across all axes
-        max_range = max(x_max - x_min, y_max - y_min, z_max - z_min)
-        
-        # Calculate the center of each axis
-        mid_x = (x_max + x_min) / 2
-        mid_y = (y_max + y_min) / 2
-        mid_z = (z_max + z_min) / 2
-        
-        # Set the limits to be cubic around the collective center
-        ax1.set_xlim(mid_x - max_range / 2, mid_x + max_range / 2)
-        ax1.set_ylim(mid_y - max_range / 2, mid_y + max_range / 2)
-        ax1.set_zlim(mid_z - max_range / 2, mid_z + max_range / 2)
+        # Keep equal aspect by expanding the smaller span
+        span = max(x_max - x_min, y_max - y_min)
+        mid_x = 0.5 * (x_max + x_min)
+        mid_y = 0.5 * (y_max + y_min)
+
+        ax1.set_xlim(mid_x - span / 2, mid_x + span / 2)
+        ax1.set_ylim(mid_y - span / 2, mid_y + span / 2)
+
+    # Ensure equal aspect ratio for the 2D plot
+    ax1.set_aspect('equal', adjustable='box')
 
     ax1.set_xlabel("X", fontsize=12)
     ax1.set_ylabel("Y", fontsize=12)
-    ax1.set_zlabel("Z", fontsize=12)
     ax1.grid(True, linestyle="--", alpha=0.4)
+    ax1.legend()  # legend for "Start" and "Final Position"
 
-    # Add connecting lines between targets in final formation to show tetrahedron shape
-    if T_xyz.shape[0] >= 2:
-        # Connect all targets to show the tetrahedron edges
-        for i in range(T_xyz.shape[0]):
-            for j in range(i+1, T_xyz.shape[0]):
-                ax1.plot([T_xyz[i, 0], T_xyz[j, 0]], [T_xyz[i, 1], T_xyz[j, 1]], [T_xyz[i, 2], T_xyz[j, 2]], 
+    # Add connecting lines between targets in final formation to show shape
+    if T_xy.shape[0] >= 2:
+        # Connect all targets to show the final shape edges
+        for i in range(T_xy.shape[0]):
+            for j in range(i + 1, T_xy.shape[0]):
+                ax1.plot([T_xy[i, 0], T_xy[j, 0]], [T_xy[i, 1], T_xy[j, 1]],
                         'k--', alpha=0.5, linewidth=0.8)
 
     plt.tight_layout()
