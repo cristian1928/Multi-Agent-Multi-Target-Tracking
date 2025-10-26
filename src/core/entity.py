@@ -71,20 +71,26 @@ class Target(Entity):
     def __init__(self, initial_position: NDArray[np.float64], time_steps: int, config: dict[str, Any]) -> None:
         super().__init__(initial_position, time_steps, config)
         self.k1: float = config['targets_proportional_gain']
-        # Target offset defines desired position in formation
+        self.is_centroid: bool = bool(
+            config.get('is_centroid', False) or config.get('tracking_type') == 'f8_dynamics'
+        )
 
     def compute_control_output(self, step: int) -> None:
         time = step * self.time_step_delta
-        desired_velocity = dynamics.none(time) if hasattr(dynamics, 'none') else np.zeros(self.num_states)
 
-    # Formation-aware neighborhood consensus: ∑[(q_j + δ_j) - (q_i + δ_i)]
+        # Only the centroid gets a desired velocity
+        desired_velocity = np.zeros(self.num_states)
+        if self.is_centroid and hasattr(dynamics, 'f8_dynamics'):
+            desired_velocity = dynamics.f8_dynamics(time)  
+
+
         neighborhood_consensus_term = np.zeros(self.num_states)
         for neighbor in self.neighbors:
             if isinstance(neighbor, Target):
                 neighbor_total = neighbor.positions[:, step - 1] + neighbor.offsets
-                self_total = self.positions[:, step - 1] + self.offsets
+                self_total     = self.positions[:, step - 1] + self.offsets
                 neighborhood_consensus_term += neighbor_total - self_total
 
-    # Combine consensus with internal dynamics
         self.synchronization_error = neighborhood_consensus_term
         self.control_output = self.k1 * self.synchronization_error + desired_velocity
+
