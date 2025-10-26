@@ -128,6 +128,9 @@ def make_offsets_agents(agent_specs: list[tuple[np.ndarray, dict]],
                     agent_offsets[:, j] -= delta_ij_1
     return agent_offsets
 
+#---------------------------------------------------------------
+
+
 def make_offsets_targets(target_specs: list[tuple[np.ndarray, dict]],
                          target_offsets: np.ndarray,
                          time_steps: int,

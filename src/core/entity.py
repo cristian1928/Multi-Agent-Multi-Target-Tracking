@@ -72,7 +72,7 @@ class Target(Entity):
         super().__init__(initial_position, time_steps, config)
         self.k1: float = config['targets_proportional_gain']
         self.is_centroid: bool = bool(
-            config.get('is_centroid', False) or config.get('tracking_type') == 'f8_dynamics'
+            config.get('is_centroid', False) or config.get('tracking_type') == 'none'
         )
 
     def compute_control_output(self, step: int) -> None:
