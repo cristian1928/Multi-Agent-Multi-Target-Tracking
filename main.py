@@ -126,7 +126,6 @@ def make_offsets_agents_triangle(agent_specs: list[tuple[np.ndarray, dict]],
                 offsets[:, j]    -= delta_ij / len(g)
     return offsets
 
-
 # ---------------------------------------------------------------
 
 def make_offsets_agents_square(agent_specs: list[tuple[np.ndarray, dict]],
@@ -343,9 +342,6 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
 
 # ---------------------------------------------------------------
 
-
-    # ===================== PLOTTING =====================
-
     def _plot_group_3d(ax, objs, color, start_lbl, end_lbl, zorder=3):
         if not objs: 
             return
@@ -371,7 +367,6 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
         ax.scatter(c[0], c[1], c[2], s=160, marker='o', color=color, edgecolor='k',
                 linewidth=1.0, zorder=10)
 
-    # --- TETRA styling ---
     _TET_EDGE_W  = 2.8
     _TET_VERT_S  = 120
     _TET_VERT_EC = 'k'
