@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import itertools
 import json
 from pathlib import Path
 from typing import Any, List, Tuple
@@ -88,45 +88,71 @@ def construct_undirected_neighborhood_set(entities: list[Any], edge_set: list[li
 
 # ---------------------------------------------------------------
 
-def make_offsets_agents(agent_specs: list[tuple[np.ndarray, dict]],
-                        agent_offsets: np.ndarray,
-                        target_specs: list[tuple[np.ndarray, dict]],
-                        time_steps: int,
-                        base_config: dict[str, Any],
-                        neighbors: list[list[int]]) -> np.ndarray:
-
+def make_offsets_agents_triangle(agent_specs: list[tuple[np.ndarray, dict]],
+                                 target_specs: list[tuple[np.ndarray, dict]],
+                                 neighbors: list[list[int]],
+                                 group: list[int],
+                                 target_index: int) -> np.ndarray:
     nd = int(agent_specs[0][1]['num_states'])
-    N = len(agent_specs)
-    agent_offsets = np.zeros((nd, N))
+    N  = len(agent_specs)
+    offsets = np.zeros((nd, N))
 
-    if target_specs and N >= 3:
-        target_pos = target_specs[0][0]
-        agent_positions = np.array([spec[0] for spec in agent_specs])
-        l = np.linalg.norm(agent_positions[1] - agent_positions[0])
+    if not target_specs or not (0 <= target_index < len(target_specs)) or len(group) < 3:
+        return offsets
 
-        # tri_formation = [
-        #     np.array([0, l/np.sqrt(3), 0]),
-        #     np.array([l/2, -l*np.sqrt(3)/6, 0]),
-        #     np.array([-l/2, -l*np.sqrt(3)/6, 0])
-        # ]
+    target_pos = target_specs[target_index][0]
+    agent_positions = np.array([spec[0] for spec in agent_specs])
+    l = np.linalg.norm(agent_positions[1] - agent_positions[0])
 
-        square_formation = [
-            np.array([-l/2, -l/2, 0]),
-            np.array([l/2, -l/2,  0]),
-            np.array([l/2,  l/2,  0]),
-            np.array([-l/2, l/2,  0])
-        ]
+    tri_formation = [
+        np.array([   0,        l/np.sqrt(3),   0]),
+        np.array([ l/2,     - l*np.sqrt(3)/6,  0]),
+        np.array([-l/2,     - l*np.sqrt(3)/6,  0]),
+    ]
 
-        desired_positions = [target_pos + vertex for vertex in square_formation]
+    g = group[:3]
+    desired = {g[i]: target_pos + tri_formation[i] for i in range(3)}
 
-        for i in range(4):
-            for j in neighbors[i]:
-                if i < j:
-                    # square formation around target 1
-                    delta_ij_1 = desired_positions[j] - desired_positions[i]
-                    agent_offsets[:, i] += delta_ij_1
-                    agent_offsets[:, j] -= delta_ij_1
-    return agent_offsets
+    gset = set(g)
+    for i in g:
+        for j in neighbors[i]:
+            if j in gset and i < j:
+                d = desired[j] - desired[i]
+                offsets[:, i] += d
+                offsets[:, j] -= d
+
+    return offsets
+
+def make_offsets_agents_square(agent_specs, target_specs, neighbors, group, target_index):
+    nd = int(agent_specs[0][1]['num_states'])
+    N  = len(agent_specs)
+    offsets = np.zeros((nd, N))
+    if not target_specs or len(group) < 4: 
+        return offsets
+
+    target_pos = target_specs[target_index][0]
+    agent_positions = np.array([spec[0] for spec in agent_specs])
+    l = np.linalg.norm(agent_positions[1] - agent_positions[0])  # o fija un L deseado
+
+    # vértices ideales (cuadrado de lado l, centrado en el target)
+    square_formation = [
+        np.array([-l/2, -l/2, 0]),
+        np.array([ l/2, -l/2, 0]),
+        np.array([ l/2,  l/2, 0]),
+        np.array([-l/2,  l/2, 0]),
+    ]
+
+    # usa exactamente los 4 primeros del grupo
+    g = group[:4]
+    desired = {g[i]: target_pos + square_formation[i] for i in range(4)}
+
+    # imponer todas las parejas (lados y diagonales)
+    for a, b in itertools.combinations(g, 2):
+        d = desired[b] - desired[a]
+        offsets[:, a] += d
+        offsets[:, b] -= d
+
+    return offsets
 
 #---------------------------------------------------------------
 
@@ -172,6 +198,11 @@ def make_offsets_targets(target_specs: list[tuple[np.ndarray, dict]],
 
     return target_offsets
 
+# ---------------------------------------------------------------
+
+def chunk_triplets(idxs: list[int]) -> list[list[int]]:
+    return [idxs[i:i+3] for i in range(0, len(idxs), 3) if len(idxs[i:i+3]) == 3]
+
 
 # ---------------------------------------------------------------
 
@@ -187,99 +218,120 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
     agent_specs  = build_entity_specs(base_config, section_key="agents")
 
     nd_targets = int(target_specs[0][1]['num_states'])
+
     nd_agents  = int(agent_specs[0][1]['num_states'])
     N_targets  = len(target_specs)
     N_agents   = len(agent_specs)
 
-
-    # construct neighbors list (0-indexed)
-    target_neighbors: list[list[int]] = [[] for _ in range(N_targets)]
-    for i, j in base_config["target_edge_set"]:
-        target_neighbors[i - 1].append(j - 1)
-        target_neighbors[j - 1].append(i - 1)
-
+    # vecinos sobre TODOS los agentes (luego filtramos por grupo dentro de la función)
     agent_neighbors: list[list[int]] = [[] for _ in range(N_agents)]
     for i, j in base_config["agent_edge_set"]:
         agent_neighbors[i - 1].append(j - 1)
         agent_neighbors[j - 1].append(i - 1)
-    
 
-    # compute offsets
-    agent_offsets = np.zeros((nd_agents, N_agents))
-    agent_offsets = make_offsets_agents(agent_specs, agent_offsets, target_specs, time_steps, base_config, agent_neighbors)
-    
+    # --- definir grupos por slicing:
+    k_square = 4  # últimos 4 hacen el cuadrado
+    if N_agents < k_square:
+        raise ValueError("Se necesitan al menos 4 agentes para el cuadrado.")
 
-    # create targets
-    target_offsets = np.zeros((nd_targets, N_targets))
+    square_group = list(range(N_agents - k_square, N_agents))
+    tri_pool     = list(range(0, N_agents - k_square))  # todos los anteriores
+    tri_groups   = chunk_triplets(tri_pool)             # bloques de 3 (descarta residuo <3)
+
+    # el cuadrado va alrededor de T1 (índice 0), triángulos alrededor de T2 si existe, si no T1
+    sq_t_idx  = 0
+    tri_t_idx = 1 if len(target_specs) >= 2 else 0
+
+    # --- offsets totales
+    nd_agents = int(agent_specs[0][1]['num_states'])
+    offsets_total = np.zeros((nd_agents, N_agents))
+
+    # sumar offsets de cada grupo triangular
+    for g in tri_groups:
+        off_tri = make_offsets_agents_triangle(agent_specs, target_specs,
+                                               agent_neighbors, g, tri_t_idx)
+        offsets_total[:, g] += off_tri[:, g]  # solo columnas del grupo
+
+    # sumar offsets del grupo cuadrado
+    off_sq = make_offsets_agents_square(agent_specs, target_specs,
+                                        agent_neighbors, square_group, sq_t_idx)
+    offsets_total[:, square_group] += off_sq[:, square_group]
+
+    # --- crear targets
+
+    target_offsets = np.zeros((nd_targets, len(target_specs)))
+    target_neighbors: list[list[int]] = [[] for _ in range(N_targets)]
+    for i, j in base_config["target_edge_set"]:
+        i0, j0 = i - 1, j - 1
+        if 0 <= i0 < N_targets and 0 <= j0 < N_targets:
+            target_neighbors[i0].append(j0)
+            target_neighbors[j0].append(i0)
+            
     target_offsets = make_offsets_targets(target_specs, target_offsets, time_steps, base_config, target_neighbors)
 
-#--------------------------------------------------------------
-
     targets: list[Target] = [
-        Target(
-            initial_position=pos,
-            time_steps=time_steps,
-            config=conf,
-        )
+        Target(initial_position=pos, time_steps=time_steps, config=conf)
         for pos, conf in target_specs
     ]
-    # Assign offsets
-    for i, target in enumerate(targets):
-        target.offsets = target_offsets[:, i]
-        
-#--------------------------------------------------------------
+    for i, t in enumerate(targets):
+        t.offsets = target_offsets[:, i]
 
+    # --- crear agentes (UNA sola lista)
     agents: list[Agent] = [
-        Agent(
-        initial_position=pos,
-        time_steps=time_steps,
-        config=conf,
-        targets = targets,
-        pin_row = np.zeros(0, dtype=np.float64)
-        )
+        Agent(initial_position=pos, time_steps=time_steps, config=conf,
+              targets=targets, pin_row=np.zeros(0, dtype=np.float64))
         for pos, conf in agent_specs
     ]
-    # Assign offsets
-    for i, agent in enumerate(agents):
-        agent.offsets = agent_offsets[:, i]
 
-    # Attach targets and pinning
+    # asignar offsets a cada agente desde offsets_total
+    for i, ag in enumerate(agents):
+        ag.offsets = offsets_total[:, i]
+
+    # pinning y targets
     pinning_matrix: NDArray[np.float64] = np.array(base_config["pinning_matrix"], dtype=float)
+    for i, ag in enumerate(agents):
+        ag.targets = targets
+        ag.pin_row = pinning_matrix[i, :].copy()
 
-    for target in targets:
-        target.targets = targets
-
-    for agent in agents:
-        agent.targets = targets
-
-    for index, agent in enumerate(agents):
-        #target.targets = targets
-        agent.targets = targets
-        agent.pin_row = pinning_matrix[index, :].copy()
-
-    # Construct neighborhoods for targets
+    # neighborhoods
     construct_undirected_neighborhood_set(targets, base_config.get("target_edge_set", []))
-    construct_undirected_neighborhood_set(agents, base_config.get("agent_edge_set", []))
+    construct_undirected_neighborhood_set(agents,  base_config.get("agent_edge_set", []))
 
-    # Simulation loop
+    # --- loop de simulación (UNA pasada)
     for step in range(1, time_steps):
-        for agent in agents:
-            agent.compute_control_output(step)
-        for target in targets:
-            target.compute_control_output(step)
-        for agent in agents:
-            agent.update_dynamics(step)
-        for target in targets:
-            target.update_dynamics(step)
+        for ag in agents:  ag.compute_control_output(step)
+        for tg in targets: tg.compute_control_output(step)
+        for ag in agents:  ag.update_dynamics(step)
+        for tg in targets: tg.update_dynamics(step)
 
         simulation_time: float = step * time_step_delta
-
-
-        save_state_to_csv(step, simulation_time, agents, targets)
+        save_state_to_csv(step, simulation_time, agents, targets)  # ← firma original
 
         print(f"Progress: {step / time_steps * 100:6.2f}%", end="\r", flush=True)
 
-    print("\nSimulation completed.")
+
+
+    # print("\nSimulation completed.")
+    # print("coordinates of final position of A1:", agents[0].positions[:3, step])
+    # print("coordinates of final position of A2:", agents[1].positions[:3, step])
+    # print("coordinates of final position of A3:", agents[2].positions[:3, step])
+    # print("coordinates of final postion of T1:", targets[0].positions[:3, step] if targets else "N/A")
+    # print("------------------------------------------------------------------------------------")
+    # print("coordinates of final position of A12:", agents[3].positions[:3, step])
+    # print("coordinates of final position of A13:", agents[4].positions[:3, step])
+    # print("coordinates of final position of A11:", agents[5].positions[:3, step])
+    # print("coordinates of final position of A10:", agents[6].positions[:3, step])
+    # print("coordinates of final postion of T4:", targets[3].positions[:3, step] if targets else "N/A")
+
+    # print("------------------------------------------------------------------------------------")
+
+    # # idxs = los 4 del grupo del cuadrado, en el orden g de arriba
+    # pts = [agents[i].positions[:3, -1] for i in g]
+    # def dist(a,b): 
+    #     return float(np.linalg.norm(pts[a]-pts[b]))
+    # print("Lados:", dist(0,1), dist(1,2), dist(2,3), dist(3,0))
+    # print("Diagonales:", dist(0,2), dist(1,3))
+
     close_all_files()
 
 # ---------------------------------------------------------------
@@ -320,8 +372,11 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
             ax3.plot([x[0], x[-1]], [y[0], y[-1]], [z[0], z[-1]],
                     'k--', alpha=0.45, linewidth=0.9, zorder=zorder)
 
-    _plot_group_3d(targets, color='red',  start_lbl='Target start', end_lbl='Target final', zorder=5)
-    _plot_group_3d(agents,  color='blue', start_lbl='Agent start',  end_lbl='Agent final',  zorder=4)
+    _plot_group_3d(targets, color='red', start_lbl='Target start', end_lbl='Target final', zorder=5)
+    _plot_group_3d([agents[i] for i in square_group], color='blue',   start_lbl='Square start',   end_lbl='Square final',   zorder=4)
+    for g in tri_groups:
+        _plot_group_3d([agents[i] for i in g],        color='purple', start_lbl='Triangle start', end_lbl='Triangle final', zorder=4)
+
 
     C_traj = None
     if targets:
@@ -343,32 +398,32 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
 
         T_xyz = np.array([tg.positions[:3, end_step] for tg in targets]) if targets else np.empty((0, 3))
 
-    if T_xyz.shape[0] >= 2:
-        cfg_edges = base_config.get("target_edge_set", [])
-        if cfg_edges:
-            for (i1, j1) in cfg_edges:
-                i, j = i1 - 1, j1 - 1
-                if 0 <= i < T_xyz.shape[0] and 0 <= j < T_xyz.shape[0]:
-                    ax3.plot([T_xyz[i, 0], T_xyz[j, 0]],
-                            [T_xyz[i, 1], T_xyz[j, 1]],
-                            [T_xyz[i, 2], T_xyz[j, 2]],
-                            'k--', alpha=0.6, linewidth=0.9, zorder=2)
-        else:
-            for i in range(T_xyz.shape[0]):
-                for j in range(i + 1, T_xyz.shape[0]):
-                    ax3.plot([T_xyz[i, 0], T_xyz[j, 0]],
-                            [T_xyz[i, 1], T_xyz[j, 1]],
-                            [T_xyz[i, 2], T_xyz[j, 2]],
-                            'k--', alpha=0.6, linewidth=0.9, zorder=2)
+    # if T_xyz.shape[0] >= 2:
+    #     cfg_edges = base_config.get("target_edge_set", [])
+    #     if cfg_edges:
+    #         for (i1, j1) in cfg_edges:
+    #             i, j = i1 - 1, j1 - 1
+    #             if 0 <= i < T_xyz.shape[0] and 0 <= j < T_xyz.shape[0]:
+    #                 ax3.plot([T_xyz[i, 0], T_xyz[j, 0]],
+    #                         [T_xyz[i, 1], T_xyz[j, 1]],
+    #                         [T_xyz[i, 2], T_xyz[j, 2]],
+    #                         'k--', alpha=0.6, linewidth=0.9, zorder=2)
+    #     else:
+    #         for i in range(T_xyz.shape[0]):
+    #             for j in range(i + 1, T_xyz.shape[0]):
+    #                 ax3.plot([T_xyz[i, 0], T_xyz[j, 0]],
+    #                         [T_xyz[i, 1], T_xyz[j, 1]],
+    #                         [T_xyz[i, 2], T_xyz[j, 2]],
+    #                         'k--', alpha=0.6, linewidth=0.9, zorder=2)
 
-    if T_xyz.shape[0] >= 3:
-        C = T_xyz.mean(axis=0)  # centroid of vertices
-        # ax3.scatter(C[0], C[1], C[2],
-        #             s=160, marker='*', color='black', edgecolor='yellow', linewidth=1.2,
-        #             zorder=8, label='Tetra centroid')
-        for v in T_xyz:
-            ax3.plot([C[0], v[0]], [C[1], v[1]], [C[2], v[2]],
-                    ':', color='gray', alpha=0.4, linewidth=0.9, zorder=3)
+    # if T_xyz.shape[0] >= 3:
+    #     C = T_xyz.mean(axis=0)  # centroid of vertices
+    #     # ax3.scatter(C[0], C[1], C[2],
+    #     #             s=160, marker='*', color='black', edgecolor='yellow', linewidth=1.2,
+    #     #             zorder=8, label='Tetra centroid')
+    #     for v in T_xyz:
+    #         ax3.plot([C[0], v[0]], [C[1], v[1]], [C[2], v[2]],
+    #                 ':', color='gray', alpha=0.4, linewidth=0.9, zorder=3)
 
     for j, tg in enumerate(targets or []):
         p = tg.positions[:3, end_step]
