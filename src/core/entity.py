@@ -9,7 +9,6 @@ from numpy.typing import NDArray
 from ..simulation import dynamics
 from ..simulation.integrate import integrate_step
 
-
 class Entity:
     def __init__(self, initial_position: NDArray[np.float64], time_steps: int, config: dict[str, Any]) -> None:
         self.id: str = config['id']
@@ -43,8 +42,7 @@ class Agent(Entity):
 
     def compute_control_output(self, step: int) -> None:
         position = self.positions[:, step - 1]
-    
-    # Formation-aware neighborhood consensus: ∑[(q_j + δ_j) - (q_i + δ_i)]
+
         neighborhood_consensus_term = np.zeros(self.num_states)
         for neighbor in self.neighbors:
             if isinstance(neighbor, Agent):
@@ -52,19 +50,17 @@ class Agent(Entity):
                 self_total = position + self.offsets
                 neighborhood_consensus_term += neighbor_total - self_total
 
-    # MOVING TARGET TRACKING: Drive (q_i + δ_i) → q_0(t)
         target_consensus_term = np.zeros(self.num_states)
         if len(self.targets) and self.pin_row.size:
             for index, weight in enumerate(self.pin_row):
                 if weight != 0.0:
-                # Current target position q_0(t)
                     current_target_pos = self.targets[index].positions[:, step - 1]
-                # Drive (position + offset) → current_target_pos
                     self_total = position + self.offsets
                     target_consensus_term += weight * (current_target_pos - self_total)
 
         self.synchronization_error = target_consensus_term + neighborhood_consensus_term
         self.control_output = self.k1 * self.synchronization_error
+        self.control_output[2] = 0.0  # Zero out z-axis control for agents
 
 
 class Target(Entity):
@@ -77,12 +73,9 @@ class Target(Entity):
 
     def compute_control_output(self, step: int) -> None:
         time = step * self.time_step_delta
-
-        # Only the centroid gets a desired velocity
         desired_velocity = np.zeros(self.num_states)
         if self.is_centroid and hasattr(dynamics, 'f8_dynamics'):
-            desired_velocity = dynamics.f8_dynamics(time)  
-
+            desired_velocity = dynamics.f8_dynamics(time)
 
         neighborhood_consensus_term = np.zeros(self.num_states)
         for neighbor in self.neighbors:
@@ -93,4 +86,3 @@ class Target(Entity):
 
         self.synchronization_error = neighborhood_consensus_term
         self.control_output = self.k1 * self.synchronization_error + desired_velocity
-

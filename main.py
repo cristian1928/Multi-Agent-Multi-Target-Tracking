@@ -236,37 +236,36 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
     for i, j in base_config["agent_edge_set"]:
         agent_neighbors[i - 1].append(j - 1)
         agent_neighbors[j - 1].append(i - 1)
-
-    # --- definir grupos por slicing:
-    k_square = 4  # últimos 4 hacen el cuadrado
+    
+    # define groups by slicing  
+    k_square = 4  # last 4 form a square
     if N_agents < k_square:
         raise ValueError("Se necesitan al menos 4 agentes para el cuadrado.")
 
     square_group = list(range(N_agents - k_square, N_agents))
-    tri_pool     = list(range(0, N_agents - k_square))  # todos los anteriores
+    tri_pool     = list(range(0, N_agents - k_square))  
     tri_groups   = chunk_triplets(tri_pool)             
 
-    # el cuadrado va alrededor de T1 (índice 0), triángulos alrededor de T2 si existe, si no T1
+    # square around T1 (index 0), triangle around T2 if exists
     sq_t_idx  = 0
     tri_t_idx = 1 if len(target_specs) >= 2 else 0
 
-    # --- offsets totales
+    # total offsets
     nd_agents = int(agent_specs[0][1]['num_states'])
     offsets_total = np.zeros((nd_agents, N_agents))
 
-    # sumar offsets de cada grupo triangular
+    # offset sum of each triangular group
     for g in tri_groups:
         off_tri = make_offsets_agents_triangle(agent_specs, target_specs,
                                                agent_neighbors, g, tri_t_idx)
-        offsets_total[:, g] += off_tri[:, g]  # solo columnas del grupo
+        offsets_total[:, g] += off_tri[:, g]  # only columns of group
 
-    # sumar offsets del grupo cuadrado
+    # sum offset of square group
     off_sq = make_offsets_agents_square(agent_specs, target_specs,
                                         agent_neighbors, square_group, sq_t_idx)
     offsets_total[:, square_group] += off_sq[:, square_group]
 
-    # --- crear targets
-
+    # create targets
     target_offsets = np.zeros((nd_targets, len(target_specs)))
     target_neighbors: list[list[int]] = [[] for _ in range(N_targets)]
     for i, j in base_config["target_edge_set"]:
@@ -293,7 +292,7 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
     for i, ag in enumerate(agents):
         ag.offsets = offsets_total[:, i]
 
-    # pinning y targets
+    # pinning and targets
     pinning_matrix: NDArray[np.float64] = np.array(base_config["pinning_matrix"], dtype=float)
     for i, ag in enumerate(agents):
         ag.targets = targets
@@ -315,27 +314,6 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
         print(f"Progress: {step / time_steps * 100:6.2f}%", end="\r", flush=True)
 
 
-
-    # print("\nSimulation completed.")
-    # print("coordinates of final position of A1:", agents[0].positions[:3, step])
-    # print("coordinates of final position of A2:", agents[1].positions[:3, step])
-    # print("coordinates of final position of A3:", agents[2].positions[:3, step])
-    # print("coordinates of final postion of T1:", targets[0].positions[:3, step] if targets else "N/A")
-    # print("------------------------------------------------------------------------------------")
-    # print("coordinates of final position of A12:", agents[3].positions[:3, step])
-    # print("coordinates of final position of A13:", agents[4].positions[:3, step])
-    # print("coordinates of final position of A11:", agents[5].positions[:3, step])
-    # print("coordinates of final position of A10:", agents[6].positions[:3, step])
-    # print("coordinates of final postion of T4:", targets[3].positions[:3, step] if targets else "N/A")
-
-    # print("------------------------------------------------------------------------------------")
-
-    # # idxs = los 4 del grupo del cuadrado, en el orden g de arriba
-    # pts = [agents[i].positions[:3, -1] for i in g]
-    # def dist(a,b): 
-    #     return float(np.linalg.norm(pts[a]-pts[b]))
-    # print("Lados:", dist(0,1), dist(1,2), dist(2,3), dist(3,0))
-    # print("Diagonales:", dist(0,2), dist(1,3))
 
     close_all_files()
 
