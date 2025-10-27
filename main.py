@@ -1,5 +1,4 @@
 from __future__ import annotations
-import itertools
 import json
 from pathlib import Path
 from typing import Any, List, Tuple
@@ -93,69 +92,80 @@ def make_offsets_agents_triangle(agent_specs: list[tuple[np.ndarray, dict]],
                                  neighbors: list[list[int]],
                                  group: list[int],
                                  target_index: int) -> np.ndarray:
+    
     nd = int(agent_specs[0][1]['num_states'])
     N  = len(agent_specs)
     offsets = np.zeros((nd, N))
-
-    if not target_specs or not (0 <= target_index < len(target_specs)) or len(group) < 3:
-        return offsets
 
     target_pos = target_specs[target_index][0]
     agent_positions = np.array([spec[0] for spec in agent_specs])
     l = np.linalg.norm(agent_positions[1] - agent_positions[0])
 
+    # define ideal triangle formation (equilateral)
     tri_formation = [
-        np.array([   0,        l/np.sqrt(3),   0]),
-        np.array([ l/2,     - l*np.sqrt(3)/6,  0]),
-        np.array([-l/2,     - l*np.sqrt(3)/6,  0]),
+        np.array([0, l/np.sqrt(3), 0]),
+        np.array([l/2, -l*np.sqrt(3)/6, 0]),
+        np.array([-l/2, -l*np.sqrt(3)/6, 0])
     ]
 
+    # define local indices within the global group
     g = group[:3]
-    desired = {g[i]: target_pos + tri_formation[i] for i in range(3)}
+    desired_positions = [target_pos + vertex for vertex in tri_formation]
 
-    gset = set(g)
-    for i in g:
-        for j in neighbors[i]:
-            if j in gset and i < j:
-                d = desired[j] - desired[i]
-                offsets[:, i] += d
-                offsets[:, j] -= d
-
+    # offset assignments based on neighbor relationships
+    for i in range(len(g)):
+        for j in neighbors[g[i]]:
+            if j in g:
+                i_local = g.index(g[i])
+                j_local = g.index(j)
+                delta_ij = desired_positions[j_local] - desired_positions[i_local]
+                delta_ij = desired_positions[j_local] - desired_positions[i_local]
+                offsets[:, g[i]] += delta_ij / len(g)
+                offsets[:, j]    -= delta_ij / len(g)
     return offsets
 
-def make_offsets_agents_square(agent_specs, target_specs, neighbors, group, target_index):
+
+# ---------------------------------------------------------------
+
+def make_offsets_agents_square(agent_specs: list[tuple[np.ndarray, dict]],
+                               target_specs: list[tuple[np.ndarray, dict]],
+                               neighbors: list[list[int]],
+                               group: list[int],
+                               target_index: int) -> np.ndarray:
+    
     nd = int(agent_specs[0][1]['num_states'])
     N  = len(agent_specs)
     offsets = np.zeros((nd, N))
-    if not target_specs or len(group) < 4: 
-        return offsets
 
     target_pos = target_specs[target_index][0]
     agent_positions = np.array([spec[0] for spec in agent_specs])
-    l = np.linalg.norm(agent_positions[1] - agent_positions[0])  
+    l = np.linalg.norm(agent_positions[1] - agent_positions[0])
 
-    # ideal vertex positions (square of side l, centered at the target)
+    # ideal vertex positions (square of side l, centered at target)
     square_formation = [
         np.array([-l/2, -l/2, 0]),
         np.array([ l/2, -l/2, 0]),
         np.array([ l/2,  l/2, 0]),
-        np.array([-l/2,  l/2, 0]),
+        np.array([-l/2,  l/2, 0])
     ]
-
-    # usa exactamente los 4 primeros del grupo
+    
+    # define local indices within the global group
     g = group[:4]
-    desired = {g[i]: target_pos + square_formation[i] for i in range(4)}
+    desired_positions = [target_pos + vertex for vertex in square_formation]
 
-    # impose all the pairs (sides and diagonals)
-    for a, b in itertools.combinations(g, 2):
-        d = desired[b] - desired[a]
-        offsets[:, a] += d
-        offsets[:, b] -= d
-
+    # offset assignments based on neighbor relationships
+    for i in range(len(g)):
+        for j in neighbors[g[i]]:
+            if j in g:
+                i_local = g.index(g[i])
+                j_local = g.index(j)
+                delta_ij = desired_positions[j_local] - desired_positions[i_local]
+                delta_ij = desired_positions[j_local] - desired_positions[i_local]
+                offsets[:, g[i]] += delta_ij / len(g)
+                offsets[:, j]    -= delta_ij / len(g)
     return offsets
 
 #---------------------------------------------------------------
-
 
 def make_offsets_targets(target_specs: list[tuple[np.ndarray, dict]],
                          target_offsets: np.ndarray,
@@ -175,13 +185,13 @@ def make_offsets_targets(target_specs: list[tuple[np.ndarray, dict]],
 
         target_positions = np.array([spec[0] for spec in target_specs])
         d = np.linalg.norm(target_positions[1] - target_positions[0])
-        h = np.sqrt(6) * d / 3
+        h = np.sqrt(6)*d/3
 
         tet_formation = [
             np.array([0, 0, 0]),
             np.array([d, 0, 0]),
-            np.array([d / 2, np.sqrt(3) * d / 2, 0]),
-            np.array([d / 2, np.sqrt(3) * d / 6, h])
+            np.array([d/2, np.sqrt(3)*d/2, 0]),
+            np.array([d/2, np.sqrt(3)*d/6, h])
         ]
 
         desired_positions_1 = [target_pos_1 + vertex for vertex in tet_formation]
@@ -193,16 +203,14 @@ def make_offsets_targets(target_specs: list[tuple[np.ndarray, dict]],
             for j in neighbors[i]:
                 if i < j and j < 4:
                     delta_ij_1 = desired_positions_1[j] - desired_positions_1[i]
-                    target_offsets[:, i] += delta_ij_1/4
-                    target_offsets[:, j] -= delta_ij_1/4
-
-    return target_offsets
+                    target_offsets[:, i] += delta_ij_1 / 4
+                    target_offsets[:, j] -= delta_ij_1 / 4
+        return target_offsets
 
 # ---------------------------------------------------------------
 
 def chunk_triplets(idxs: list[int]) -> list[list[int]]:
     return [idxs[i:i+3] for i in range(0, len(idxs), 3) if len(idxs[i:i+3]) == 3]
-
 
 # ---------------------------------------------------------------
 
@@ -388,14 +396,13 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
                         '-', color='red', alpha=0.95, linewidth=_TET_EDGE_W, zorder=8)
 
     def _finalize_3d(ax):
-        # collect all points for limits
+
         xyz_chunks = []
         for obj in (targets or []):
             xyz_chunks.append(obj.positions[:3, :end_step + 1].T)
         for obj in (agents or []):
             xyz_chunks.append(obj.positions[:3, :end_step + 1].T)
 
-        # also the final 4 target vertices (for centering/boost)
         T_final = None
         if len(targets) >= 4:
             T_final = np.array([tg.positions[:3, end_step] for tg in targets[:4]])
@@ -409,11 +416,10 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
             mins = mins - spans * pad
             maxs = maxs + spans * pad
 
-            # if tetra available, center/boost around it to make it clearer
             span = float(np.max(maxs - mins))
             if T_final is not None:
                 cT = T_final.mean(axis=0)
-                boost = 1.6   # >1.0 enlarges the displayed cube around tetra
+                boost = 1.6  
                 span = span * boost
                 center = cT
             else:
@@ -432,7 +438,6 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
         ax.grid(True)
         # NOTE: legend and title intentionally omitted
 
-    # --- convergence detection (unchanged logic) ---
     formation_reached_step = time_steps - 1
     formation_threshold = 0.1
     check_stride = 10
@@ -446,11 +451,9 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
     cut_at_formation = False
     end_step = formation_reached_step if cut_at_formation else (time_steps - 1)
 
-    # --- IDs (unchanged) ---
     target_ids = [conf.get("id", f"T{i+1}") for i, (_, conf) in enumerate(target_specs)]
     agent_ids  = [conf.get("id", f"A{i+1}") for i, (_, conf) in enumerate(agent_specs)]
 
-    # Colors
     square_color = 'tab:blue'
     tri_colors   = ['tab:purple', 'tab:green', 'tab:orange', 'tab:brown']
 

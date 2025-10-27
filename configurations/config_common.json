@@ -17,6 +17,9 @@
     {"id": "A4", "dynamics_type": "none", "initial_position": [60.0, 10.0, 0.0], "num_states": 3 },
     {"id": "A5", "dynamics_type": "none", "initial_position": [5.0, 15.0, 0.0], "num_states": 3 },
     {"id": "A6", "dynamics_type": "none", "initial_position": [7.0, -5.0, 0.0], "num_states": 3 },
+    {"id": "A7", "dynamics_type": "none", "initial_position": [30.0, -4.0, 0.0], "num_states": 3 },
+    {"id": "A8", "dynamics_type": "none", "initial_position": [-18.0, 32.0, 0.0], "num_states": 3 },
+    {"id": "A9", "dynamics_type": "none", "initial_position": [35.0, 5.0, 0.0], "num_states": 3 },
     {"id": "A12", "dynamics_type": "none", "initial_position": [-10.0, 0.0, 0.0], "num_states": 3 },
     {"id": "A13", "dynamics_type": "none", "initial_position": [0.0, -2.0, 0.0], "num_states": 3 },
     {"id": "A11", "dynamics_type": "none", "initial_position": [0.0, 5.0, 0.0], "num_states": 3 },
@@ -27,17 +30,21 @@
 
  "agent_edge_set": [
   [1,2], [2,3], [3,1],      
-  [4,5], [5,6], [6,4],  
-  [7,8], [8,9], [9,10], [10,7] 
+  [4,5], [5,6], [6,4],
+  [7, 8], [8,9], [9,7],
+  [10, 11], [11, 12], [12, 13], [13, 10] 
 ],
 
     "pinning_matrix": [
     [0, 0, 0, 0],
     [1, 0, 0, 0],
     [0, 0, 0, 0],
+    [0, 0, 0, 0],
     [0, 1, 0, 0],
-    [0, 0, 0, 0],
-    [0, 0, 0, 0],
+    [0, 1, 0, 0],
+    [0, 0, 1, 0],
+    [0, 0, 1, 0],
+    [0, 0, 1, 0],
     [0, 0, 0, 0],
     [0, 0, 0, 1],
     [0, 0, 0, 1],
