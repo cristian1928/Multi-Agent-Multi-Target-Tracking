@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 from ..simulation import dynamics
 from ..simulation.integrate import integrate_step
 
+
 class Entity:
     def __init__(self, initial_position: NDArray[np.float64], time_steps: int, config: dict[str, Any]) -> None:
         self.id: str = config['id']
@@ -32,6 +33,7 @@ class Entity:
         result = integrate_step(self.positions[:, step - 1], step, self.time_step_delta, dynamics_with_control)
         self.positions[:, step] = result
 
+# ---------------------------------------------------------------------
 
 class Agent(Entity):
     def __init__(self, initial_position: NDArray[np.float64], time_steps: int, config: dict[str, Any], targets: List["Target"], pin_row: Optional[NDArray[np.float64]] = None, offset: Optional[NDArray[np.float64]] = None) -> None:
@@ -43,8 +45,6 @@ class Agent(Entity):
 
     def compute_control_output(self, step: int) -> None:
         position = self.positions[:, step - 1]
-    
-    # Formation-aware neighborhood consensus: ∑[(q_j + δ_j) - (q_i + δ_i)]
         neighborhood_consensus_term = np.zeros(self.num_states)
         for neighbor in self.neighbors:
             if isinstance(neighbor, Agent):
@@ -61,9 +61,13 @@ class Agent(Entity):
                     target_consensus_term += weight * (current_target_pos - self_total)
 
         self.synchronization_error = target_consensus_term + neighborhood_consensus_term
-        self.control_output = self.k1 * self.synchronization_error
-        self.control_output[2] = 0.0  # Zero out z-axis control for agents
 
+        # Restriction map on agents z-axis movement
+        self.synchronization_error[2] = 0.0
+        self.control_output = self.k1 * self.synchronization_error
+        #self.control_output[2] = 0.0 
+
+# ---------------------------------------------------------------------
 
 class Target(Entity):
     def __init__(self, initial_position: NDArray[np.float64], time_steps: int, config: dict[str, Any]) -> None:
@@ -88,4 +92,3 @@ class Target(Entity):
 
         self.synchronization_error = neighborhood_consensus_term
         self.control_output = self.k1 * self.synchronization_error + desired_velocity
-
