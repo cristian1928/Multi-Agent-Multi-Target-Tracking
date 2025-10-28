@@ -1,5 +1,5 @@
 {
-  "final_time": 150,
+  "final_time": 300,
   "time_step_delta": 0.01,
   "seed": 0,
   
@@ -47,11 +47,10 @@
     [0, 0, 1, 0],
     [0, 0, 0, 0],
     [0, 0, 0, 1],
-    [0, 0, 0, 0],
-    [0, 0, 0, 1]
-
+    [0, 0, 0, 1],
+    [0, 0, 0, 0]
   ],
-  
-  "agents_proportional_gain": 5,
-  "targets_proportional_gain": 0.1
+
+  "agents_proportional_gain": 10,
+  "targets_proportional_gain": 10
 }

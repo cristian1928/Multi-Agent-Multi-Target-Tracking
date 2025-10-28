@@ -44,6 +44,7 @@ class Agent(Entity):
     def compute_control_output(self, step: int) -> None:
         position = self.positions[:, step - 1]
     
+    # Formation-aware neighborhood consensus: ∑[(q_j + δ_j) - (q_i + δ_i)]
         neighborhood_consensus_term = np.zeros(self.num_states)
         for neighbor in self.neighbors:
             if isinstance(neighbor, Agent):
@@ -76,7 +77,7 @@ class Target(Entity):
         time = step * self.time_step_delta
         desired_velocity = np.zeros(self.num_states)
         if self.is_centroid and hasattr(dynamics, 'f8_dynamics'):
-            desired_velocity = dynamics.f8_dynamics(time)  
+            desired_velocity = dynamics.f8_dynamics(time)
 
         neighborhood_consensus_term = np.zeros(self.num_states)
         for neighbor in self.neighbors:
@@ -87,5 +88,4 @@ class Target(Entity):
 
         self.synchronization_error = neighborhood_consensus_term
         self.control_output = self.k1 * self.synchronization_error + desired_velocity
-
 

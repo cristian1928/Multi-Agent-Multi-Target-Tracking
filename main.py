@@ -483,8 +483,8 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
         for i, tg in enumerate(targets):
             legend_handles.append(Line2D([0],[0], color=T_leg_colors[i], lw=2.0, label=f'Target {tg.id}'))
         legend_handles.extend([
-            Line2D([0],[0], color=colors["tt_link"], lw=2.2, label='Target-Target link'),
-            Line2D([0],[0], color=colors["at_link"], lw=1.8, label='Agent-Target link'),
+            Line2D([0],[0], color=colors["tt_link"], lw=2.2, label='Target–Target link'),
+            Line2D([0],[0], color=colors["at_link"], lw=1.8, label='Agent→Target link'),
             Line2D([0],[0], color=colors["inter_form_link"], lw=1.6, label='Cross-formation A–A link'),
             Line2D([0],[0], color='black', lw=1.6, ls='--', label='Agent–Agent edge'),
         ])
