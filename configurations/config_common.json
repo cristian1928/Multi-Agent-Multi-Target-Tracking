@@ -4,10 +4,10 @@
   "seed": 0,
   
   "targets": [
-    {"id": "T1", "dynamics_type": "none", "tracking_type": "f8_dynamics", "initial_position": [40.0, 9.0, -10.0], "num_states": 3 },
-    {"id": "T2", "dynamics_type": "none", "tracking_type": "f8_dynamics", "initial_position": [60.0, 5.0, -15.0], "num_states": 3 },
-    {"id": "T3", "dynamics_type": "none", "tracking_type": "f8_dynamics", "initial_position": [35.0, 3.0, -20.0], "num_states": 3 },
-    {"id": "T4", "dynamics_type": "none", "tracking_type": "f8_dynamics", "initial_position": [43.0, 8.0, -16.0], "num_states": 3 }
+    {"id": "T1", "dynamics_type": "none", "tracking_type": "none", "initial_position": [40.0, 9.0, -20.0], "num_states": 3 },
+    {"id": "T2", "dynamics_type": "none", "tracking_type": "none", "initial_position": [60.0, 5.0, -43.0], "num_states": 3 },
+    {"id": "T3", "dynamics_type": "none", "tracking_type": "none", "initial_position": [35.0, 3.0, -28.0], "num_states": 3 },
+    {"id": "T4", "dynamics_type": "none", "tracking_type": "none", "initial_position": [43.0, 8.0, -36.0], "num_states": 3 }
   ],
 
   "agents": [
@@ -47,11 +47,11 @@
     [0, 0, 1, 0],
     [0, 0, 0, 0],
     [0, 0, 0, 1],
-    [0, 0, 0, 1],
-    [0, 0, 0, 0]
+    [0, 0, 0, 0],
+    [0, 0, 0, 1]
 
   ],
   
-  "agents_proportional_gain": 10,
-  "targets_proportional_gain": 10
+  "agents_proportional_gain": 5,
+  "targets_proportional_gain": 0.1
 }

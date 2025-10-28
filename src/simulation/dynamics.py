@@ -28,7 +28,7 @@ def attitude_mrp(state: NDArray[np.float64]) -> NDArray[np.float64]:
     b_mat: NDArray[np.float64] = (1.0 - r_sq) * np.eye(3) + 2.0 * _skew(r) + 2.0 * np.outer(r, r)
 
     j_inertia: NDArray[np.float64] = np.diag([2.0, 1.2, 1.6])             # kg·m^2
-    tau_body: NDArray[np.float64] = np.array([0.0, 0.15, 0.0])            # N·m
+    tau_body: NDArray[np.float64] = np.array([0.0, 0.15, 0.0])             # N·m
     omega_body: NDArray[np.float64] = np.linalg.inv(j_inertia) @ tau_body  # rad/s
 
     r_dot: NDArray[np.float64] = 0.5 * b_mat @ omega_body

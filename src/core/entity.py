@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any, List, Optional
+from xml.parsers.expat import errors
 
 import numpy as np
 from numpy.typing import NDArray
@@ -68,7 +69,7 @@ class Target(Entity):
         super().__init__(initial_position, time_steps, config)
         self.k1: float = config['targets_proportional_gain']
         self.is_centroid: bool = bool(
-            config.get('is_centroid', False) or config.get('tracking_type') == 'none'
+            config.get('is_centroid', False) or config.get('tracking_type') == 'f8_dynamics'
         )
 
     def compute_control_output(self, step: int) -> None:
@@ -86,4 +87,5 @@ class Target(Entity):
 
         self.synchronization_error = neighborhood_consensus_term
         self.control_output = self.k1 * self.synchronization_error + desired_velocity
+
 
