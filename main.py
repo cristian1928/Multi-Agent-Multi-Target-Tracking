@@ -15,6 +15,7 @@ from src.io.data_manager import close_all_files, save_state_to_csv
 from src.visualization.plotter import results
 from src.simulation.dynamics import get_initial_conditions
 
+# no offset 
 # ---------------------------------------------------------------
 
 def build_entity_specs(base_config: dict[str, Any], section_key: str) -> List[Tuple[NDArray[np.float64], dict[str, Any]]]:
