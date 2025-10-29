@@ -69,12 +69,33 @@ def plot_from_csv() -> None:
 
     # ─── Tracking Error Norm ───
     if agents_state_data:
+        import re
+
         figure_error, axis_error = plt.subplots(figsize=(8, 6))
+
+        rows = []
         for i, agent_dataframe in enumerate(agents_state_data):
             error_series = agent_dataframe['Synchronization Error Norm']
             rms_value = float(np.sqrt(np.mean(error_series**2)))
-            name = agent_names[i]
-            axis_error.plot(time_values, error_series, label=f'{name}: RMS {rms_value:.2f} $m$', color=agent_color_map[name], linestyle='solid')
+            name = agent_names[i]                       # p.ej., "A10"
+            # extrae número del nombre; fallback a i+1 si no coincide
+            m = re.search(r'\d+', name)
+            agent_num = int(m.group()) if m else (i + 1)
+            rows.append((agent_num, name, error_series, rms_value))
+
+        # ordenar por número de agente: A1, A2, ..., A10, ...
+        rows.sort(key=lambda t: t[0])
+
+        # plot en orden y con nueva etiqueta
+        for agent_num, orig_name, error_series, rms_value in rows:
+            axis_error.plot(
+                time_values,
+                error_series,
+                label=f'Agent {agent_num}: RMS {rms_value:.2f} $m$',
+                color=agent_color_map[orig_name],       # conserva el color
+                linestyle='solid'
+            )
+
         axis_error.set_xlabel('Time (s)')
         axis_error.set_ylabel('Synchronization Error Norm $(m)$')
         axis_error.legend(loc='best', fontsize=12, frameon=True, edgecolor='black')
@@ -106,7 +127,7 @@ def plot_from_csv() -> None:
     axis_traj.set_ylabel('Y Position (m)')
     axis_traj.set_zlabel('Z Position (m)')    # type: ignore
     axis_traj.set_box_aspect((1, 1, 1))       # type: ignore
-    axis_traj.legend(loc='best', fontsize=12, frameon=True, edgecolor='black')
+    # axis_traj.legend(loc='best', fontsize=12, frameon=True, edgecolor='black')
     plt.tight_layout()
 
 

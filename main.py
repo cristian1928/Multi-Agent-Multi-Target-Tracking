@@ -237,14 +237,6 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
     target_specs = build_entity_specs(base_config, section_key="targets")
     agent_specs  = build_entity_specs(base_config, section_key="agents")
 
-     # === DEBUG === imprimir exactamente lo que pediste (y un poco más útil)
-    print("\n[DEBUG] Configs fusionadas de TARGETS (como entran a Target(...))")
-    for pos, conf in target_specs:
-        print(
-            f"Target {conf.get('id')}: is_centroid={conf.get('is_centroid', False)}, "
-            f"tracking_type={conf.get('tracking_type')}, dynamics_type={conf.get('dynamics_type')}"
-        )
-
     nd_targets = int(target_specs[0][1]['num_states'])
 
     nd_agents  = int(agent_specs[0][1]['num_states'])
