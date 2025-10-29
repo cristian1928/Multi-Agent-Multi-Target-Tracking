@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 import itertools
 import json
@@ -371,28 +370,20 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
             "at_link": 'tab:cyan',
             "inter_form_link": 'tab:olive'
         }
-<<<<<<< HEAD
 
         # One distinct color per agent (tab20 cycles)
         tab20 = plt.get_cmap('tab20').colors
         agent_colors = {i: tab20[i % len(tab20)] for i in range(len(agents))}
         link_alpha = 0.95
 
+        # One distinct color per target (use tab10)
+        tab10 = plt.get_cmap('tab10').colors
+        target_colors = {i: tab10[i % len(tab10)] for i in range(len(targets))}
+
         # Helper for 2D lines
         def _line2d(ax, p, q, c, lw=1.8, a=link_alpha, ls='-'):
-=======
-
-        # NEW: one distinct color per agent (tab20 cycles after 20)
-        tab20 = plt.get_cmap('tab20').colors
-        agent_colors = {i: tab20[i % len(tab20)] for i in range(len(agents))}
-
-        link_alpha = 0.95
-        
-        # helper for 2D lines
-        def _line2d(p, q, c, lw=1.8, a=link_alpha, ls='-'):
->>>>>>> faa253b9248770939428bc40fcd34801a7ec8faf
             ax.plot([p[0], q[0]], [p[1], q[1]],
-                    linestyle=ls, color=c, alpha=a, linewidth=lw, zorder=8)
+                    linestyle=ls, color=c, alpha=a, linewidth=lw, zorder=5)
 
         # Build labels for formations
         agent_label = {}
@@ -407,7 +398,6 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
         # Steps to render
         steps = [t0, tf]
 
-<<<<<<< HEAD
         # ---------- Compute global limits across both steps ----------
         all_pts = []
         for step in steps:
@@ -434,76 +424,27 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
             T_now = [tg.positions[:2, step] for tg in targets] if targets else []
             A_now = [ag.positions[:2, step] for ag in agents]  if agents  else []
 
-            # Targets (points only)
+            # Targets (points only) — now each target gets its own color
             if targets:
-                for p in T_now:
-                    ax.scatter(p[0], p[1], s=90, marker='X', color='red',
-                            edgecolor='k', linewidth=0.7, zorder=7)
+                for idx, p in enumerate(T_now):
+                    c = target_colors.get(idx, 'red')
+                    ax.scatter(p[0], p[1], s=90, marker='X', color=c,
+                               edgecolor='k', linewidth=0.7, zorder=7)
 
             # Agents (points only, per-agent colors)
             if 'square_group' in locals() and square_group:
                 for i in square_group:
                     p = A_now[i]
                     ax.scatter(p[0], p[1], s=70, marker='o',
-                            color=agent_colors[i],
-                            edgecolor='k', linewidth=0.6, zorder=6)
-=======
-        # ---------- SCATTER TARGETS (points only) ----------
-        # Plotted as red markers for readability (legend gives distinct colors per target name)
-        if targets:
-            for j, p in enumerate(T_now):
-                ax.scatter(p[0], p[1], s=90, marker='X', color='red',
-                        edgecolor='k', linewidth=0.7, zorder=7)
-                
-        # ---------- SCATTER AGENTS (points only, per-agent colors) ----------
-        if 'square_group' in locals() and square_group:
-            for i in square_group:
-                p = A_now[i]
-                ax.scatter(
-                    p[0], p[1],
-                    s=70, marker='o',
-                    color=agent_colors[i],         # ← unique color per agent
-                    edgecolor='k', linewidth=0.6, zorder=6
-                )
-
-        if 'tri_groups' in locals() and tri_groups:
-            for gi, g in enumerate(tri_groups):
-                for i in g:
-                    p = A_now[i]
-                    ax.scatter(
-                        p[0], p[1],
-                        s=65, marker='o',
-                        color=agent_colors[i],     # ← unique color per agent
-                        edgecolor='k', linewidth=0.6, zorder=6
-                    )
-
-        # ---------- LINKS ----------
-        # Target↔Target (one color)
-        if targets and "target_edge_set" in base_config:
-            for i, j in base_config["target_edge_set"]:
-                i0, j0 = i - 1, j - 1
-                if 0 <= i0 < len(T_now) and 0 <= j0 < len(T_now):
-                    _line2d(T_now[i0], T_now[j0], colors["tt_link"], lw=2.2)
-
-        # Agent→Target (pinning) (one color)
-        if agents and targets:
-            for i, ag in enumerate(agents):
-                if getattr(ag, "pin_row", _np.zeros(0)).size:
-                    for t_idx, w in enumerate(ag.pin_row):
-                        if w != 0.0 and 0 <= t_idx < len(T_now):
-                            _line2d(A_now[i], T_now[t_idx], colors["at_link"], lw=1.8)
-
-        # Intra-formation Agent↔Agent (formation color)
-        if agents:
-            # Triangles
->>>>>>> faa253b9248770939428bc40fcd34801a7ec8faf
+                               color=agent_colors[i],
+                               edgecolor='k', linewidth=0.6, zorder=6)
             if 'tri_groups' in locals() and tri_groups:
                 for gi, g in enumerate(tri_groups):
                     for i in g:
                         p = A_now[i]
                         ax.scatter(p[0], p[1], s=65, marker='o',
-                                color=agent_colors[i],
-                                edgecolor='k', linewidth=0.6, zorder=6)
+                                   color=agent_colors[i],
+                                   edgecolor='k', linewidth=0.6, zorder=6)
 
             # Target↔Target links
             if targets and "target_edge_set" in base_config:
@@ -519,7 +460,7 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
                     if row.size:
                         for t_idx, w in enumerate(row):
                             if w != 0.0 and 0 <= t_idx < len(T_now):
-                                _line2d(ax, A_now[i], T_now[t_idx], colors["at_link"], lw=1.8)
+                                _line2d(ax, A_now[i], T_now[t_idx], colors["at_link"], lw=1.6, ls=':', a=0.9)
 
             # Intra-formation Agent↔Agent
             if agents:
@@ -549,8 +490,7 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
                                 continue
                             _line2d(ax, A_now[i], A_now[j], col, lw=1.8)
 
-            # Cross-formation Agent↔Agent
-            if agents:
+                # Inter-formation dotted links (draw per-axis so both subplots get them)
                 for i, ag in enumerate(agents):
                     for nb in ag.neighbors:
                         try:
@@ -561,35 +501,81 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
                             continue
                         li = agent_label.get(i, None); lj = agent_label.get(j, None)
                         if li is not None and lj is not None and li != lj:
-                            _line2d(ax, A_now[i], A_now[j], colors["inter_form_link"], lw=1.6)
+                            _line2d(ax, A_now[i], A_now[j],
+                                    colors["inter_form_link"], lw=1.6, ls=':', a=0.9)
 
-            # Axis limits & style (no titles, no per-axes legends)
+            # Axis limits & style
             ax.set_xlim(*xlim); ax.set_ylim(*ylim)
             ax.set_aspect('equal', 'box')
             ax.set_xlabel("X"); ax.set_ylabel("Y")
-            ax.grid(True)
+            ax.set_axisbelow(True)
+            ax.grid(True, linestyle='--', alpha=0.5)
 
         # ---------- Figure-level legend at bottom (four link types only) ----------
-        # Representative color for "within formation" (use square color as exemplar)
         within_form_color = colors["square"]
-
         legend_handles = [
-            Line2D([0], [0], color=colors["tt_link"],   lw=2.2, label='Target–Target connection'),
-            Line2D([0], [0], color=colors["at_link"],   lw=1.8, label='Agent→Target connection'),
-            Line2D([0], [0], color=within_form_color,   lw=1.8, label='Agent–Agent (within formation)'),
-            Line2D([0], [0], color=colors["inter_form_link"], lw=1.6, label='Agent–Agent (out of formation)'),
+            Line2D([0], [0], color=colors["tt_link"],   lw=2.2, label='Target-Target'),
+            Line2D([0], [0], color=colors["at_link"],   lw=1.6, linestyle=':', label='Agent-Target'),
+            Line2D([0], [0], color=within_form_color,   lw=1.8, label='Agent-Agent (within formation)'),
+            Line2D([0], [0], color=colors["inter_form_link"], lw=1.6,
+                   linestyle=':', label='Agent-Agent (out of formation)'),
         ]
 
+        # create per-agent handles (colored circles) and per-target handles (colored X)
+        agent_handles = []
+        agent_labels  = []
+        for i in range(len(agents)):
+            # use agent id from config if available, otherwise fallback to A{i}
+            label = None
+            try:
+                # agent_specs is available in outer scope; prefer spec id
+                label = agent_specs[i][1].get("id")
+            except Exception:
+                pass
+            if not label:
+                # fallback to Agent object attribute if present
+                label = getattr(agents[i], "id", None) or f"A{i+1}"
+            h = Line2D([0], [0],
+                       marker='o', linestyle='',
+                       markersize=7,
+                       markerfacecolor=agent_colors.get(i, 'gray'),
+                       markeredgecolor='k')
+            agent_handles.append(h)
+            agent_labels.append(label)
+        
+        target_handles = []
+        target_labels = []
+        for i in range(len(targets)):
+            # use target id from config if available, otherwise fallback to T{i}
+            label = None
+            try:
+                label = target_specs[i][1].get("id")
+            except Exception:
+                pass
+            if not label:
+                label = getattr(targets[i], "id", None) or f"T{i+1}"
+            h = Line2D([0], [0],
+                       marker='X', linestyle='',
+                       markersize=9,
+                       markerfacecolor=target_colors.get(i, 'red'),
+                       markeredgecolor='k')
+            target_handles.append(h)
+            target_labels.append(label)
+
+        # top legend removed per user request
+        # (agent/target colors are still used in the 2D subplots; only the top legend was removed)
+
         fig.legend(
-            handles=legend_handles,
-            loc='lower center',
-            ncol=2,
-            frameon=True,
-            fontsize='small',
-            bbox_to_anchor=(0.5, -0.02)  # slightly below the subplots
-        )
-        # Make room for the bottom legend
-        fig.subplots_adjust(bottom=0.18)
+             handles=legend_handles,
+             loc='lower center',
+             ncol=2,
+             frameon=True,
+             fontsize='small',
+             # raise legend slightly higher but keep it below the axes
+             bbox_to_anchor=(0.5, 0.06)
+         )
+        # Make room for the bottom legend (no reserved top legend space)
+        fig.subplots_adjust(bottom=0.22)
 
         plt.show(block=False)
 

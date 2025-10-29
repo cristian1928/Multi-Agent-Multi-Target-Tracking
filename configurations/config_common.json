@@ -1,13 +1,13 @@
 {
-  "final_time": 30,
+  "final_time": 50,
   "time_step_delta": 0.01,
   "seed": 0,
   
   "targets": [
-    {"id": "T1", "dynamics_type": "current_target", "tracking_type": "f8_dynamics", "initial_position": [40.0, 9.0, -20.0], "num_states": 3 },
-    {"id": "T2", "dynamics_type": "current_target", "tracking_type": "f8_dynamics", "initial_position": [60.0, 5.0, -43.0], "num_states": 3 },
-    {"id": "T3", "dynamics_type": "current_target", "tracking_type": "f8_dynamics", "initial_position": [35.0, 3.0, -28.0], "num_states": 3 },
-    {"id": "T4", "dynamics_type": "current_target", "tracking_type": "f8_dynamics", "initial_position": [43.0, 8.0, -36.0], "num_states": 3 }
+    {"id": "T1", "dynamics_type": "current_target", "tracking_type": "f8_dynamics", "initial_position": [40.0, 9.0, -37.0], "num_states": 3 },
+    {"id": "T2", "dynamics_type": "current_target", "tracking_type": "f8_dynamics", "initial_position": [60.0, 5.0, -47.0], "num_states": 3 },
+    {"id": "T3", "dynamics_type": "current_target", "tracking_type": "f8_dynamics", "initial_position": [35.0, 3.0, -30.0], "num_states": 3 },
+    {"id": "T4", "dynamics_type": "current_target", "tracking_type": "f8_dynamics", "initial_position": [43.0, 8.0, -40.0], "num_states": 3 }
   ],
 
   "agents": [
@@ -33,11 +33,7 @@
   [4,5], [5,6], [6,4],
   [7, 8], [8,9], [9,7],
   [10, 11], [11, 12], [12, 13], [13, 10],
-<<<<<<< HEAD
   [1, 4], [6, 13], [9, 11], [7, 10], [3, 12]
-=======
-  [1, 4], [6, 13], [9, 11], [7, 10], [3,12]
->>>>>>> faa253b9248770939428bc40fcd34801a7ec8faf
 ],
 
     "pinning_matrix": [
@@ -50,12 +46,12 @@
     [0, 0, 1, 0],
     [0, 0, 1, 0],
     [0, 0, 1, 0],
+    [0, 0, 0, 1],
     [0, 0, 0, 0],
-    [0, 0, 0, 1],
-    [0, 0, 0, 1],
-    [0, 0, 0, 0]
+    [0, 0, 0, 0],
+    [0, 0, 0, 1]
   ],
 
-  "agents_proportional_gain": 25,
-  "targets_proportional_gain": 25
+  "agents_proportional_gain": 10,
+  "targets_proportional_gain": 2
 }

@@ -292,14 +292,14 @@ def f8_dynamics(time: float) -> NDArray[np.float64]:
     """
 
     # In-plane figure-8 (Lissajous-style)
-    A: float     = 25      # Amplitude in x-direction
-    B: float     = 15      # Amplitude in y-direction
+    A: float     = 20.0          # Amplitude in x-direction
+    B: float     = 10            # Amplitude in y-direction
     a: float     = 1.0           # Frequency in x-direction
     b: float     = 2.0           # Frequency in y-direction
     delta: float = np.pi / 2.0   # Phase shift (x)
 
     # Vertical oscillation parameters
-    C: float       = 15# Amplitude in z-direction
+    C: float       = 15        # Amplitude in z-direction
     c: float       = 1         # Frequency in z-direction
     delta_z: float = 0         # Phase shift (z)
 
