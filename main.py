@@ -368,14 +368,19 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
 
         # ---------- COLOR SCHEME ----------
         colors = {
-            "square": 'tab:blue',                      # formation color for square agents
-            "tris":   ['tab:purple', 'tab:green', 'tab:orange', 'tab:brown'],  # per-triangle formation color
-            "tt_link": 'tab:red',                      # target-to-target links
-            "at_link": 'tab:cyan',                     # agent-to-target links
-            "inter_form_link": 'tab:olive'             # cross-formation agent-agent links
+            "square": 'tab:blue',
+            "tris":   ['tab:purple', 'tab:green', 'tab:orange', 'tab:brown'],
+            "tt_link": 'tab:red',
+            "at_link": 'tab:cyan',
+            "inter_form_link": 'tab:olive'
         }
-        link_alpha = 0.95
 
+        # NEW: one distinct color per agent (tab20 cycles after 20)
+        tab20 = plt.get_cmap('tab20').colors
+        agent_colors = {i: tab20[i % len(tab20)] for i in range(len(agents))}
+
+        link_alpha = 0.95
+        
         # helper for 2D lines
         def _line2d(p, q, c, lw=1.8, a=link_alpha, ls='-'):
             ax.plot([p[0], q[0]], [p[1], q[1]],
@@ -401,22 +406,28 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
             for j, p in enumerate(T_now):
                 ax.scatter(p[0], p[1], s=90, marker='X', color='red',
                         edgecolor='k', linewidth=0.7, zorder=7)
-
-        # ---------- SCATTER AGENTS (points only, formation colors) ----------
+                
+        # ---------- SCATTER AGENTS (points only, per-agent colors) ----------
         if 'square_group' in locals() and square_group:
-            col = colors["square"]
             for i in square_group:
                 p = A_now[i]
-                ax.scatter(p[0], p[1], s=70, marker='o', color=col,
-                        edgecolor='k', linewidth=0.6, zorder=6)
+                ax.scatter(
+                    p[0], p[1],
+                    s=70, marker='o',
+                    color=agent_colors[i],         # ← unique color per agent
+                    edgecolor='k', linewidth=0.6, zorder=6
+                )
 
         if 'tri_groups' in locals() and tri_groups:
             for gi, g in enumerate(tri_groups):
-                col = colors["tris"][gi % len(colors["tris"])]
                 for i in g:
                     p = A_now[i]
-                    ax.scatter(p[0], p[1], s=65, marker='o', color=col,
-                            edgecolor='k', linewidth=0.6, zorder=6)
+                    ax.scatter(
+                        p[0], p[1],
+                        s=65, marker='o',
+                        color=agent_colors[i],     # ← unique color per agent
+                        edgecolor='k', linewidth=0.6, zorder=6
+                    )
 
         # ---------- LINKS ----------
         # Target↔Target (one color)

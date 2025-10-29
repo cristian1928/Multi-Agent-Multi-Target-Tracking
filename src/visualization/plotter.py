@@ -14,20 +14,20 @@ TARGET_DATA_DIR = os.path.join(DATA_DIR, 'target_data')
 STATE_DATA_SUFFIX = '_state_data.csv'
 NN_DATA_SUFFIX = '_nn_data.csv'
 
-# def configure_plot() -> None:
-#     plt.style.use(['science', 'ieee'])
-#     plt.rcParams['figure.dpi'] = 100
-#     plt.rcParams["font.family"] = "serif"
-#     plt.rcParams["axes.labelsize"] = 14
-#     plt.rcParams["axes.titlesize"] = 16
-#     plt.rcParams["xtick.labelsize"] = 12
-#     plt.rcParams["ytick.labelsize"] = 12
-#     plt.rcParams.update({
-#         'lines.linewidth': 1.5,
-#         'axes.linewidth': 0.5,
-#         'legend.frameon': True,
-#         'legend.edgecolor': 'black',
-#     })
+def configure_plot() -> None:
+    plt.style.use(['science', 'ieee'])
+    plt.rcParams['figure.dpi'] = 100
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["axes.labelsize"] = 14
+    plt.rcParams["axes.titlesize"] = 16
+    plt.rcParams["xtick.labelsize"] = 12
+    plt.rcParams["ytick.labelsize"] = 12
+    plt.rcParams.update({
+        'lines.linewidth': 1.5,
+        'axes.linewidth': 0.5,
+        'legend.frameon': True,
+        'legend.edgecolor': 'black',
+    })
 
 def get_simulation_data() -> Tuple[List[str], List[pd.DataFrame], List[str], List[pd.DataFrame]]:
     agent_state_files = sorted([f for f in os.listdir(AGENT_DATA_DIR) if f.endswith(STATE_DATA_SUFFIX)]) if os.path.isdir(AGENT_DATA_DIR) else []
@@ -51,7 +51,7 @@ def get_color_map(names: List[str]) -> Dict[str, Tuple[float, ...]]:
     return color_map
 
 def plot_from_csv() -> None:
-    # configure_plot()
+    configure_plot()
     agent_names, agents_state_data, target_names, targets_state_data = get_simulation_data()
 
     if not agents_state_data and not targets_state_data:
