@@ -27,7 +27,7 @@ def build_entity_specs(base_config: dict[str, Any], section_key: str) -> List[Tu
         )
         merged_config = {**base_config, **item, "dynamics_type": dynamics_type}
         specs.append((initial_position, merged_config))
-    return specs
+    return specs 
 
 # ---------------------------------------------------------------
 
@@ -171,40 +171,53 @@ def make_offsets_targets(target_specs: list[tuple[np.ndarray, dict]],
                          time_steps: int,
                          base_config: dict[str, Any],
                          neighbors: list[list[int]]) -> np.ndarray:
-
+    """
+    Build target offsets for tetrahedral formation, identify centroid target,
+    and ensure centroid movement propagates to all others.
+    """
     nd = int(target_specs[0][1]['num_states'])
     N = len(target_specs)
     target_offsets = np.zeros((nd, N))
 
     if target_specs and N >= 4:
+        # --- Use first target as geometric anchor (local frame origin) ---
         target_pos_1 = target_specs[0][0]
-        # target_pos_2 = target_specs[1][0]
-        # target_pos_3 = target_specs[2][0]
-        # target_pos_4 = target_specs[3][0]
-
         target_positions = np.array([spec[0] for spec in target_specs])
+
+        # --- Geometry of tetrahedron (local coordinates) ---
         d = np.linalg.norm(target_positions[1] - target_positions[0])
-        h = np.sqrt(6)*d/3
+        h = np.sqrt(6) * d / 3
 
         tet_formation = [
             np.array([0, 0, 0]),
             np.array([d, 0, 0]),
-            np.array([d/2, np.sqrt(3)*d/2, 0]),
-            np.array([d/2, np.sqrt(3)*d/6, h])
+            np.array([d / 2, np.sqrt(3) * d / 2, 0]),
+            np.array([d / 2, np.sqrt(3) * d / 6, h])
         ]
 
-        desired_positions_1 = [target_pos_1 + vertex for vertex in tet_formation]
-        # desired_positions_2 = [target_pos_2 + vertex for vertex in tet_formation]
-        # desired_positions_3 = [target_pos_3 + vertex for vertex in tet_formation]
-        # desired_positions_4 = [target_pos_4 + vertex for vertex in tet_formation]
+        # --- Compute geometric centroid in local & global frames ---
+        # centroid_local = sum(tet_formation) / 4.0
+        # centroid_global = target_pos_1 + centroid_local
+        # print(f"Geometric centroid of tetrahedron: {centroid_global}")
 
+        # # --- Assign centroid to the target closest to geometric center ---
+        # distances = [np.linalg.norm(spec[0] - centroid_global) for spec in target_specs]
+        # centroid_idx = int(np.argmin(distances))
+        # target_specs[centroid_idx][1]['is_centroid'] = True
+        # target_specs[centroid_idx][1]['centroid_global'] = centroid_global.tolist()
+        # print(f"Auto-assigned centroid: Target {target_specs[centroid_idx][1]['id']}")
+
+        desired_positions = [target_pos_1 + vertex for vertex in tet_formation]
+
+        # --- Compute relative offsets among targets (local formation) ---
         for i in range(4):
             for j in neighbors[i]:
                 if i < j and j < 4:
-                    delta_ij_1 = desired_positions_1[j] - desired_positions_1[i]
-                    target_offsets[:, i] += delta_ij_1 / 4
-                    target_offsets[:, j] -= delta_ij_1 / 4
-        return target_offsets
+                    delta_ij = desired_positions[j] - desired_positions[i]
+                    target_offsets[:, i] += delta_ij / 4
+                    target_offsets[:, j] -= delta_ij / 4
+
+    return target_offsets
 
 # ---------------------------------------------------------------
 
@@ -224,6 +237,14 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
     target_specs = build_entity_specs(base_config, section_key="targets")
     agent_specs  = build_entity_specs(base_config, section_key="agents")
 
+     # === DEBUG === imprimir exactamente lo que pediste (y un poco más útil)
+    print("\n[DEBUG] Configs fusionadas de TARGETS (como entran a Target(...))")
+    for pos, conf in target_specs:
+        print(
+            f"Target {conf.get('id')}: is_centroid={conf.get('is_centroid', False)}, "
+            f"tracking_type={conf.get('tracking_type')}, dynamics_type={conf.get('dynamics_type')}"
+        )
+
     nd_targets = int(target_specs[0][1]['num_states'])
 
     nd_agents  = int(agent_specs[0][1]['num_states'])
@@ -236,35 +257,35 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
         agent_neighbors[i - 1].append(j - 1)
         agent_neighbors[j - 1].append(i - 1)
 
-    # --- definir grupos por slicing:
-    k_square = 4  # últimos 4 hacen el cuadrado
+    # define groups by slicing
+    k_square = 4  # last 4 make square
     if N_agents < k_square:
         raise ValueError("Se necesitan al menos 4 agentes para el cuadrado.")
 
     square_group = list(range(N_agents - k_square, N_agents))
-    tri_pool     = list(range(0, N_agents - k_square))  # todos los anteriores
+    tri_pool     = list(range(0, N_agents - k_square))  # all the previous ones
     tri_groups   = chunk_triplets(tri_pool)             
 
-    # el cuadrado va alrededor de T1 (índice 0), triángulos alrededor de T2 si existe, si no T1
+    # square around T1, triangles aruond T2 if exists
     sq_t_idx  = 0
     tri_t_idx = 1 if len(target_specs) >= 2 else 0
 
-    # --- offsets totales
+    # total offsets
     nd_agents = int(agent_specs[0][1]['num_states'])
     offsets_total = np.zeros((nd_agents, N_agents))
 
-    # sumar offsets de cada grupo triangular
+    # sum offsets of each tri group
     for g in tri_groups:
         off_tri = make_offsets_agents_triangle(agent_specs, target_specs,
                                                agent_neighbors, g, tri_t_idx)
-        offsets_total[:, g] += off_tri[:, g]  # solo columnas del grupo
+        offsets_total[:, g] += off_tri[:, g]  # only columns of group 
 
-    # sumar offsets del grupo cuadrado
+    # sum offset of square group 
     off_sq = make_offsets_agents_square(agent_specs, target_specs,
                                         agent_neighbors, square_group, sq_t_idx)
     offsets_total[:, square_group] += off_sq[:, square_group]
 
-    # --- crear targets
+    # create targets
 
     target_offsets = np.zeros((nd_targets, len(target_specs)))
     target_neighbors: list[list[int]] = [[] for _ in range(N_targets)]
@@ -292,7 +313,7 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
     for i, ag in enumerate(agents):
         ag.offsets = offsets_total[:, i]
 
-    # pinning y targets
+    # pinning and targets
     pinning_matrix: NDArray[np.float64] = np.array(base_config["pinning_matrix"], dtype=float)
     for i, ag in enumerate(agents):
         ag.targets = targets
@@ -340,168 +361,186 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
 
 # ---------------------------------------------------------------
 
-    #     # 2D snapshots (points only): agents/targets colored to match legend entries
-    # t0 = 0
-    # tm = time_steps // 2
-    # tf = time_steps - 1
+ # ---------------------------------------------------------------
+    # SNAPSHOTS (2D): show only positions at t=0, T/2, T_f (no trajectories)
+    # ---------------------------------------------------------------
 
-    # def _plot_snapshot_3d(step: int, title: str):  # keep name to avoid changing call sites
-    #     import numpy as _np
-    #     from matplotlib.lines import Line2D
-    #     fig, ax = plt.subplots(figsize=(8, 7))
+    t0 = 0
+    tm = time_steps // 2
+    tf = time_steps - 1
 
-    #     # ---------- COLORS ----------
-    #     colors = {
-    #         "square": 'tab:blue',                      # used for intra-square links (not points)
-    #         "tris":   ['tab:purple', 'tab:green', 'tab:orange', 'tab:brown'],  # used for intra-triangle links
-    #         "tt_link": 'tab:red',
-    #         "at_link": 'tab:cyan',
-    #         "inter_form_link": 'tab:olive'
-    #     }
-    #     link_alpha = 0.95
+    def _plot_snapshot_3d(step: int, title: str):  # keep name to avoid changing call sites
+        import numpy as _np
+        from matplotlib.lines import Line2D
+        fig, ax = plt.subplots(figsize=(8, 7))
 
-    #     # Legend (and point) colors: one unique color per agent & per target
-    #     tab20 = plt.get_cmap('tab20').colors
-    #     A_leg_colors = [tab20[i % 20] for i in range(len(agents))]
-    #     T_leg_colors = [tab20[(i + len(agents)) % 20] for i in range(len(targets))]
+        # ---------- COLOR SCHEME ----------
+        colors = {
+            "square": 'tab:blue',                      # formation color for square agents
+            "tris":   ['tab:purple', 'tab:green', 'tab:orange', 'tab:brown'],  # per-triangle formation color
+            "tt_link": 'tab:red',                      # target-to-target links
+            "at_link": 'tab:cyan',                     # agent-to-target links
+            "inter_form_link": 'tab:olive'             # cross-formation agent-agent links
+        }
+        link_alpha = 0.95
 
-    #     # helper for 2D lines
-    #     def _line2d(p, q, c, lw=1.8, a=link_alpha, ls='-'):
-    #         ax.plot([p[0], q[0]], [p[1], q[1]],
-    #                 linestyle=ls, color=c, alpha=a, linewidth=lw, zorder=8)
+        # helper for 2D lines
+        def _line2d(p, q, c, lw=1.8, a=link_alpha, ls='-'):
+            ax.plot([p[0], q[0]], [p[1], q[1]],
+                    linestyle=ls, color=c, alpha=a, linewidth=lw, zorder=8)
 
-    #     # Build labels for formations (used only to decide link colors)
-    #     agent_label = {}
-    #     if 'square_group' in locals() and square_group:
-    #         for idx in square_group:
-    #             agent_label[idx] = 'square'
-    #     if 'tri_groups' in locals() and tri_groups:
-    #         for k, g in enumerate(tri_groups):
-    #             for idx in g:
-    #                 agent_label[idx] = f'tri{k}'
+        # Build labels for formations
+        agent_label = {}
+        if 'square_group' in locals() and square_group:
+            for idx in square_group:
+                agent_label[idx] = 'square'
+        if 'tri_groups' in locals() and tri_groups:
+            for k, g in enumerate(tri_groups):
+                for idx in g:
+                    agent_label[idx] = f'tri{k}'
 
-    #     # Current XY positions
-    #     T_now = [tg.positions[:2, step] for tg in targets] if targets else []
-    #     A_now = [ag.positions[:2, step] for ag in agents]  if agents  else []
+        # Current XY positions
+        T_now = [tg.positions[:2, step] for tg in targets] if targets else []
+        A_now = [ag.positions[:2, step] for ag in agents]  if agents  else []
 
-    #     # ---------- SCATTER TARGETS (points only, per-target colors to match legend) ----------
-    #     if targets:
-    #         for j, p in enumerate(T_now):
-    #             ax.scatter(p[0], p[1], s=90, marker='X', color=T_leg_colors[j],
-    #                     edgecolor='k', linewidth=0.7, zorder=7)
+        # ---------- SCATTER TARGETS (points only) ----------
+        # Plotted as red markers for readability (legend gives distinct colors per target name)
+        if targets:
+            for j, p in enumerate(T_now):
+                ax.scatter(p[0], p[1], s=90, marker='X', color='red',
+                        edgecolor='k', linewidth=0.7, zorder=7)
 
-    #     # ---------- SCATTER AGENTS (points only, per-agent colors to match legend) ----------
-    #     if agents:
-    #         for i, p in enumerate(A_now):
-    #             ax.scatter(p[0], p[1], s=70, marker='o', color=A_leg_colors[i],
-    #                     edgecolor='k', linewidth=0.6, zorder=6)
+        # ---------- SCATTER AGENTS (points only, formation colors) ----------
+        if 'square_group' in locals() and square_group:
+            col = colors["square"]
+            for i in square_group:
+                p = A_now[i]
+                ax.scatter(p[0], p[1], s=70, marker='o', color=col,
+                        edgecolor='k', linewidth=0.6, zorder=6)
 
-    #     # ---------- LINKS ----------
-    #     # Target↔Target (one color)
-    #     if T_now and "target_edge_set" in base_config:
-    #         for i, j in base_config["target_edge_set"]:
-    #             i0, j0 = i - 1, j - 1
-    #             if 0 <= i0 < len(T_now) and 0 <= j0 < len(T_now):
-    #                 _line2d(T_now[i0], T_now[j0], colors["tt_link"], lw=2.2)
+        if 'tri_groups' in locals() and tri_groups:
+            for gi, g in enumerate(tri_groups):
+                col = colors["tris"][gi % len(colors["tris"])]
+                for i in g:
+                    p = A_now[i]
+                    ax.scatter(p[0], p[1], s=65, marker='o', color=col,
+                            edgecolor='k', linewidth=0.6, zorder=6)
 
-    #     # Agent→Target (pinning) (one color)
-    #     if A_now and T_now:
-    #         for i, ag in enumerate(agents):
-    #             if getattr(ag, "pin_row", _np.zeros(0)).size:
-    #                 for t_idx, w in enumerate(ag.pin_row):
-    #                     if w != 0.0 and 0 <= t_idx < len(T_now):
-    #                         _line2d(A_now[i], T_now[t_idx], colors["at_link"], lw=1.8)
+        # ---------- LINKS ----------
+        # Target↔Target (one color)
+        if targets and "target_edge_set" in base_config:
+            for i, j in base_config["target_edge_set"]:
+                i0, j0 = i - 1, j - 1
+                if 0 <= i0 < len(T_now) and 0 <= j0 < len(T_now):
+                    _line2d(T_now[i0], T_now[j0], colors["tt_link"], lw=2.2)
 
-    #     # Intra-formation Agent↔Agent (formation colors for the LINKS only)
-    #     if A_now:
-    #         # Triangles
-    #         if 'tri_groups' in locals() and tri_groups:
-    #             for gi, g in enumerate(tri_groups):
-    #                 col = colors["tris"][gi % len(colors["tris"])]
-    #                 for i in g:
-    #                     for nb in agents[i].neighbors:
-    #                         try:
-    #                             j = agents.index(nb)
-    #                         except ValueError:
-    #                             continue
-    #                         if j <= i or j not in g:
-    #                             continue
-    #                         _line2d(A_now[i], A_now[j], col, lw=1.8)
-    #         # Square
-    #         if 'square_group' in locals() and square_group:
-    #             col = colors["square"]
-    #             for i in square_group:
-    #                 for nb in agents[i].neighbors:
-    #                     try:
-    #                         j = agents.index(nb)
-    #                     except ValueError:
-    #                         continue
-    #                     if j <= i or j not in square_group:
-    #                         continue
-    #                     _line2d(A_now[i], A_now[j], col, lw=1.8)
+        # Agent→Target (pinning) (one color)
+        if agents and targets:
+            for i, ag in enumerate(agents):
+                if getattr(ag, "pin_row", _np.zeros(0)).size:
+                    for t_idx, w in enumerate(ag.pin_row):
+                        if w != 0.0 and 0 <= t_idx < len(T_now):
+                            _line2d(A_now[i], T_now[t_idx], colors["at_link"], lw=1.8)
 
-    #     # Cross-formation Agent↔Agent (neutral color)
-    #     if A_now:
-    #         for i, ag in enumerate(agents):
-    #             for nb in ag.neighbors:
-    #                 try:
-    #                     j = agents.index(nb)
-    #                 except ValueError:
-    #                     continue
-    #                 if j <= i:
-    #                     continue
-    #                 li = agent_label.get(i, None); lj = agent_label.get(j, None)
-    #                 if li is not None and lj is not None and li != lj:
-    #                     _line2d(A_now[i], A_now[j], colors["inter_form_link"], lw=1.6)
+        # Intra-formation Agent↔Agent (formation color)
+        if agents:
+            # Triangles
+            if 'tri_groups' in locals() and tri_groups:
+                for gi, g in enumerate(tri_groups):
+                    col = colors["tris"][gi % len(colors["tris"])]
+                    for i in g:
+                        for nb in agents[i].neighbors:
+                            try:
+                                j = agents.index(nb)
+                            except ValueError:
+                                continue
+                            if j <= i or j not in g:
+                                continue
+                            _line2d(A_now[i], A_now[j], col, lw=1.8)
+            # Square
+            if 'square_group' in locals() and square_group:
+                col = colors["square"]
+                for i in square_group:
+                    for nb in agents[i].neighbors:
+                        try:
+                            j = agents.index(nb)
+                        except ValueError:
+                            continue
+                        if j <= i or j not in square_group:
+                            continue
+                        _line2d(A_now[i], A_now[j], col, lw=1.8)
 
-    #     # Agent edge set (dashed black)
-    #     if A_now and "agent_edge_set" in base_config:
-    #         for i, j in base_config["agent_edge_set"]:
-    #             i0, j0 = i - 1, j - 1
-    #             if 0 <= i0 < len(A_now) and 0 <= j0 < len(A_now):
-    #                 _line2d(A_now[i0], A_now[j0], 'black', lw=1.6, a=0.85, ls='--')
+        # Cross-formation Agent↔Agent (neutral color)
+        if agents:
+            for i, ag in enumerate(agents):
+                for nb in ag.neighbors:
+                    try:
+                        j = agents.index(nb)
+                    except ValueError:
+                        continue
+                    if j <= i:
+                        continue
+                    li = agent_label.get(i, None); lj = agent_label.get(j, None)
+                    if li is not None and lj is not None and li != lj:
+                        _line2d(A_now[i], A_now[j], colors["inter_form_link"], lw=1.6)
 
-    #     # ---------- AUTO LIMITS (2D) ----------
-    #     XY_chunks = []
-    #     for p in T_now:
-    #         XY_chunks.append(p.reshape(1, 2))
-    #     for p in A_now:
-    #         XY_chunks.append(p.reshape(1, 2))
-    #     if XY_chunks:
-    #         P = _np.vstack(XY_chunks)  # (M, 2)
-    #         mins = P.min(axis=0); maxs = P.max(axis=0)
-    #         span = _np.maximum(maxs - mins, 1e-9)
-    #         pad = 0.10 * float(_np.max(span))
-    #         ax.set_xlim(mins[0] - pad, maxs[0] + pad)
-    #         ax.set_ylim(mins[1] - pad, maxs[1] + pad)
-    #         ax.set_aspect('equal', 'box')
+        # Agent edge set (dashed black)
+        if agents and "agent_edge_set" in base_config:
+            for i, j in base_config["agent_edge_set"]:
+                i0, j0 = i - 1, j - 1
+                if 0 <= i0 < len(A_now) and 0 <= j0 < len(A_now):
+                    _line2d(A_now[i0], A_now[j0], 'black', lw=1.6, a=0.85, ls='--')
 
-    #     # ---------- LEGEND (distinct entries per agent & target) ----------
-    #     legend_handles: list[Line2D] = []
-    #     for i, ag in enumerate(agents):
-    #         legend_handles.append(Line2D([0],[0], color=A_leg_colors[i], lw=2.0, label=f'Agent {ag.id}'))
-    #     for i, tg in enumerate(targets):
-    #         legend_handles.append(Line2D([0],[0], color=T_leg_colors[i], lw=2.0, label=f'Target {tg.id}'))
-    #     legend_handles.extend([
-    #         Line2D([0],[0], color=colors["tt_link"], lw=2.2, label='Target–Target link'),
-    #         Line2D([0],[0], color=colors["at_link"], lw=1.8, label='Agent→Target link'),
-    #         Line2D([0],[0], color=colors["inter_form_link"], lw=1.6, label='Cross-formation A–A link'),
-    #         Line2D([0],[0], color='black', lw=1.6, ls='--', label='Agent–Agent edge'),
-    #     ])
-    #     ax.legend(handles=legend_handles, loc='upper left', bbox_to_anchor=(1.02, 1),
-    #             frameon=True, fontsize='small')
+        # ---------- AUTO LIMITS (2D) ----------
+        XY_chunks = []
+        for p in T_now:
+            XY_chunks.append(p.reshape(1, 2))
+        for p in A_now:
+            XY_chunks.append(p.reshape(1, 2))
+        if XY_chunks:
+            P = _np.vstack(XY_chunks)  # (M, 2)
+            mins = P.min(axis=0); maxs = P.max(axis=0)
+            span = _np.maximum(maxs - mins, 1e-9)
+            pad = 0.10 * float(_np.max(span))
+            ax.set_xlim(mins[0] - pad, maxs[0] + pad)
+            ax.set_ylim(mins[1] - pad, maxs[1] + pad)
+            ax.set_aspect('equal', 'box')
 
-    #     # ---------- AXIS DECOR ----------
-    #     ax.set_title(title)
-    #     ax.set_xlabel("X"); ax.set_ylabel("Y")
-    #     ax.grid(True)
-    #     plt.tight_layout()
-    #     plt.show(block=False)
+        # ---------- LEGEND (distinct entries per agent & target) ----------
+        # Use tab20 for legend colors (legend-only; plotted markers keep formation colors)
+        tab20 = plt.get_cmap('tab20').colors
+        A_leg_colors = [tab20[i % 20] for i in range(len(agents))]
+        T_leg_colors = [tab20[(i + len(agents)) % 20] for i in range(len(targets))]
 
-    # # Calls unchanged
-    # _plot_snapshot_3d(t0)
-    # _plot_snapshot_3d(tm)
-    # _plot_snapshot_3d(tf)
+        legend_handles: list[Line2D] = []
+        # Agents
+        for i, ag in enumerate(agents):
+            legend_handles.append(Line2D([0],[0], color=A_leg_colors[i], lw=2.0, label=f'Agent {ag.id}'))
+        # Targets
+        for i, tg in enumerate(targets):
+            legend_handles.append(Line2D([0],[0], color=T_leg_colors[i], lw=2.0, label=f'Target {tg.id}'))
+        # Link types
+        legend_handles.extend([
+            Line2D([0],[0], color=colors["tt_link"], lw=2.2, label='Target–Target link'),
+            Line2D([0],[0], color=colors["at_link"], lw=1.8, label='Agent→Target link'),
+            Line2D([0],[0], color=colors["inter_form_link"], lw=1.6, label='Cross-formation A–A link'),
+            Line2D([0],[0], color='black', lw=1.6, ls='--', label='Agent–Agent edge'),
+        ])
+        ax.legend(handles=legend_handles, loc='upper left', bbox_to_anchor=(1.02, 1),
+                frameon=True, fontsize='small')
+
+        # ---------- AXIS DECOR ----------
+        ax.set_title(title)
+        ax.set_xlabel("X"); ax.set_ylabel("Y")
+        ax.grid(True)
+        plt.tight_layout()
+        plt.show(block=False)
+
+    # Call snapshots (no changes needed elsewhere)
+    _plot_snapshot_3d(t0, f"Snapshot t=0 (step {t0})")
+    _plot_snapshot_3d(tm, f"Snapshot t=T/2 (step {tm})")
+    _plot_snapshot_3d(tf, f"Snapshot t=Tf (step {tf})")
+
 
 # ---------------------------------------------------------------
 

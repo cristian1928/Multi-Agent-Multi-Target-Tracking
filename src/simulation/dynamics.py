@@ -59,7 +59,7 @@ def chua(state: NDArray[np.float64]) -> NDArray[np.float64]:
     z_dot: float = -beta * y
     return np.array([x_dot, y_dot, z_dot], dtype=np.float64)
 
-# ---------------------------------------------------------------------
+#---------------------------------------------------------------------
 
 def trophic_dynamics(state: NDArray[np.float64]) -> NDArray[np.float64]:
     """
@@ -84,7 +84,7 @@ def trophic_dynamics(state: NDArray[np.float64]) -> NDArray[np.float64]:
     t_dot: float = -d_t * t_pop + a_pt * p_pop * t_pop
     return np.array([h_dot, p_dot, t_dot], dtype=np.float64)
 
-# ---------------------------------------------------------------------
+#---------------------------------------------------------------------
 
 def custom(state: NDArray[np.float64]) -> NDArray[np.float64]:
     """
@@ -95,96 +95,189 @@ def custom(state: NDArray[np.float64]) -> NDArray[np.float64]:
 
 # ---------------------------------------------------------------------
 
-def current_dynamics(state: NDArray[np.float64]) -> NDArray[np.float64]:
+def current_dynamics_agent(state: NDArray[np.float64]) -> NDArray[np.float64]:
     """
-    Softer 2-D current: reduced magnitudes, widened/lengthened channels,
-    and speed saturation to keep trajectories clean. No z motion (z_dot = 0).
+    Steady 2-D 'current' field with sources/sinks, vortices (eddies),
+    and Gaussian-profile channels.
+
+    Parameters
+    ----------
+    state : np.ndarray, shape (>=2,)
+        Interpreted as position [x, y, (z ...)], z ignored.
+
+    Returns
+    -------
+    np.ndarray, shape (3,)
+        Velocity [x_dot, y_dot, z_dot]; z_dot = 0.
     """
+    x: float = float(state[0])
+    y: float = float(state[1])
 
-    x, y, z = state
-    pos = np.array([x, y], dtype=np.float64)
+    # Small background drift (uniform flow)
+    vx: float = 0.20
+    vy: float = 0.05
 
-    # ---------------- TUNING (gentle defaults) ----------------
-    FLOW_GAIN    = 0.30   # scales ALL XY flow components
-    SRC_GAIN     = 0.80   # extra attenuation for sources/sinks
-    VORTEX_GAIN  = 0.50   # extra attenuation for vortices
-    CHAN_GAIN    = 0.45   # extra attenuation for channel push
-    EPS          = 1.20   # bigger => smoother/less spiky near centers
-    W_SCALE      = 2.00   # widen channels (across)
-    ELL_SCALE    = 2.50   # lengthen channels (along)
-    V_SOFT       = 0.70   # soft-saturation knee for XY speed
-    V_MAX        = 1.00   # hard clamp for XY speed (absolute)
-    # ----------------------------------------------------------
+    # Smooth singularities to keep the ODE well-behaved
+    eps: float = 0.15
 
-    # Background drift (softened)
-    v0: NDArray[np.float64] = FLOW_GAIN * np.array([0.12, 0.03], dtype=np.float64)
+    # ---------------- Sources / Sinks ----------------
+    # rows = [px, py, alpha]; alpha>0 source, alpha<0 sink
+    SS = np.array([
+        [-2.2,  1.1, +1.2],
+        [ 1.6, -1.1, -1.0],
+        [ 0.2,  2.0, +0.6],
+    ], dtype=np.float64)
 
-    # Sources / sinks: (center, strength)
-    sources: List[tuple[NDArray[np.float64], float]] = [
-        (np.array([-2.0,  1.0], dtype=np.float64), +1.2),
-        (np.array([ 1.5, -1.0], dtype=np.float64), -1.0),
-        (np.array([ 0.0,  2.0], dtype=np.float64), +0.6),
-    ]
+    if SS.size:
+        dx = x - SS[:, 0]
+        dy = y - SS[:, 1]
+        r2 = dx * dx + dy * dy + eps * eps
+        vx += np.sum(SS[:, 2] * dx / r2)
+        vy += np.sum(SS[:, 2] * dy / r2)
 
-    # Vortices / eddies: (center, circulation)
-    vortices: List[tuple[NDArray[np.float64], float]] = [
-        (np.array([-1.0, -0.5], dtype=np.float64), +0.8),  # CCW
-        (np.array([ 2.0,  1.5], dtype=np.float64), -0.6),  # CW
-    ]
+    # ---------------- Vortices / Eddies ----------------
+    # rows = [qx, qy, gamma]; gamma>0 CCW, gamma<0 CW
+    VV = np.array([
+        [-1.1, -0.6, +0.8],
+        [ 2.1,  1.4, -0.6],
+    ], dtype=np.float64)
 
-    # Channels: (center c, tangent d (unit), width w, along-length scale ell, strength beta)
-    channels: List[tuple[NDArray[np.float64], NDArray[np.float64], float, float, float]] = [
-        (np.array([-3.0,  0.0], dtype=np.float64), np.array([1.0, 0.0], dtype=np.float64), 0.4, 4.0, 0.9),
-        (np.array([ 0.0, -2.0], dtype=np.float64), (1.0/np.sqrt(2.0))*np.array([1.0, 1.0], dtype=np.float64), 0.5, 3.0, 0.6),
-    ]
+    if VV.size:
+        dx = x - VV[:, 0]
+        dy = y - VV[:, 1]
+        r2 = dx * dx + dy * dy + eps * eps
+        # rotate (dx, dy) by +90° => (-dy, dx)
+        vx += np.sum(VV[:, 2] * (-dy) / r2)
+        vy += np.sum(VV[:, 2] * ( dx) / r2)
 
-    def rot90(v: NDArray[np.float64]) -> NDArray[np.float64]:
-        return np.array([-v[1], v[0]], dtype=np.float64)
+    # ---------------- Channels (Gaussian strips) ----------------
+    # Each channel k: flow ~ beta * exp(- (n·r)^2 / (2 w^2)) * exp(- (d·r)^2 / (2 ell^2)) * d
+    def add_channel(center: tuple[float, float],
+                    d: NDArray[np.float64],
+                    n: NDArray[np.float64],
+                    beta: float,
+                    width: float,
+                    ell: float) -> None:
+        nonlocal vx, vy
+        rx = x - center[0]
+        ry = y - center[1]
+        nproj = rx * float(n[0]) + ry * float(n[1])
+        tproj = rx * float(d[0]) + ry * float(d[1])
+        gN = np.exp(-(nproj * nproj) / (2.0 * width * width))
+        gT = np.exp(-(tproj * tproj) / (2.0 * ell * ell))
+        s = beta * gN * gT
+        vx += s * float(d[0])
+        vy += s * float(d[1])
 
-    v_xy: NDArray[np.float64] = v0.copy()
+    # Unit tangents and normals
+    d1 = np.array([1.0, 0.0])                      # horizontal channel
+    n1 = np.array([0.0, 1.0])
 
-    # Sources/sinks (potential flow, softened + bigger EPS)
-    for center, alpha in sources:
-        r = pos - center
-        denom = float(r @ r) + EPS**2
-        v_xy += FLOW_GAIN * SRC_GAIN * alpha * r / denom
+    invsqrt2 = 1.0 / np.sqrt(2.0)
+    d2 = np.array([invsqrt2, invsqrt2])            # NE-tilted channel
+    n2 = np.array([-d2[1], d2[0]])
 
-    # Vortices (rotational flow, softened + bigger EPS)
-    for center, gamma in vortices:
-        r = pos - center
-        denom = float(r @ r) + EPS**2
-        v_xy += FLOW_GAIN * VORTEX_GAIN * gamma * rot90(r) / denom
+    # Channel 1: left→right river across y≈0
+    add_channel(center=(-3.0, 0.0), d=d1, n=n1, beta=0.9, width=0.45, ell=4.2)
 
-    # Channels (Gaussian profile, widened/lengthened + clipped exponent)
-    for c, d, w, ell, beta in channels:
-        d = d / np.linalg.norm(d)
-        n = rot90(d)
-        xi = pos - c
-        s_along  = float(d @ xi)
-        n_across = float(n @ xi)
+    # Channel 2: NE chute near y≈-2
+    add_channel(center=(0.0, -2.1), d=d2, n=n2, beta=0.6, width=0.50, ell=3.4)
 
-        w_eff   = max(W_SCALE  * float(w),   1e-6)
-        ell_eff = max(ELL_SCALE * float(ell), 1e-6)
-        arg = -0.5 * ((n_across / w_eff) ** 2 + (s_along / ell_eff) ** 2)
-        arg = np.clip(arg, -700.0, 0.0)  # numeric safety
-        weight = np.exp(arg)
+    return np.array([vx, vy, 0.0], dtype=np.float64)
 
-        v_xy += FLOW_GAIN * CHAN_GAIN * beta * weight * d
+# ---------------------------------------------------------------------
 
-    # # Soft saturation (keeps shape but compresses extremes)
-    # n_xy = np.linalg.norm(v_xy)
-    # if n_xy > 1e-12:
-    #     v_xy = (np.tanh(n_xy / V_SOFT) * (V_SOFT / n_xy)) * v_xy
+def current_dynamics_target(state: NDArray[np.float64]) -> NDArray[np.float64]:
+    """
+    Steady 3-D 'current' field with sources/sinks, swirlers (axis-aligned eddies),
+    and Gaussian-profile flow tubes (channels).
 
-    # # Hard clamp (absolute cap)
-    # n_xy = np.linalg.norm(v_xy)
-    # if n_xy > V_MAX:
-    #     v_xy = (V_MAX / n_xy) * v_xy
+    Parameters
+    ----------
+    state : np.ndarray, shape (>=3,)
+        Interpreted as position [x, y, z].
 
-    # No vertical motion for entities using this dynamics
-    z_dot: float = 0.0
-    return np.array([v_xy[0], v_xy[1], z_dot], dtype=np.float64)
+    Returns
+    -------
+    np.ndarray, shape (3,)
+        Velocity [x_dot, y_dot, z_dot].
+    """
+    # Position (allow shorter vectors defensively)
+    x: float = float(state[0]) if state.shape[0] > 0 else 0.0
+    y: float = float(state[1]) if state.shape[0] > 1 else 0.0
+    z: float = float(state[2]) if state.shape[0] > 2 else 0.0
 
+    # Background drift (uniform flow)
+    v0 = np.array([0.20, 0.05, 0.02], dtype=np.float64)
+    vx, vy, vz = float(v0[0]), float(v0[1]), float(v0[2])
+
+    # Small smoothing to prevent singularities
+    eps: float = 0.15
+
+    # ---------------- Sources / Sinks (3D) ----------------SS
+    # columns: [px, py, pz, alpha]; alpha>0 = source, alpha<0 = sink
+    SS = np.array([
+        [-2.0,  1.0,  0.8, +1.2],
+        [ 1.6, -1.2, -0.5, -1.0],
+        [ 0.2,  2.0,  1.6, +0.6],
+    ], dtype=np.float64)
+
+    if SS.size:
+        R = np.stack([x - SS[:, 0], y - SS[:, 1], z - SS[:, 2]], axis=1)        # (N,3)
+        r2 = np.sum(R * R, axis=1) + eps * eps                                  # (N,)
+        invr3 = 1.0 / np.power(r2, 1.5)                                          # ~ 1/r^3
+        contrib = (SS[:, 3] * invr3)[:, None] * R                                # (N,3)
+        v_src = contrib.sum(axis=0)
+        vx += float(v_src[0]); vy += float(v_src[1]); vz += float(v_src[2])
+
+    # ---------------- Swirlers / Eddies (3D) ----------------
+    # columns: [qx, qy, qz, ax, ay, az, Gamma]
+    # Flow ~ (Gamma * (a × r)) / (|r|^2 + eps^2)
+    VV = np.array([
+        [-1.2, -0.6,  0.0,   0.0, 0.0, 1.0,  +0.9],   # swirl around +Z near (-1.2,-0.6,0)
+        [ 2.0,  1.3,  0.7,   0.0, 1.0, 0.0,  -0.7],   # swirl around +Y near (2.0,1.3,0.7)
+    ], dtype=np.float64)
+
+    if VV.size:
+        Q = VV[:, 0:3]                             # centers (N,3)
+        A = VV[:, 3:6]                             # axis vectors (N,3)
+        # normalize axes
+        An = A / (np.linalg.norm(A, axis=1, keepdims=True) + 1e-12)
+        R = np.stack([x - Q[:, 0], y - Q[:, 1], z - Q[:, 2]], axis=1)            # (N,3)
+        r2 = np.sum(R * R, axis=1) + eps * eps
+        cross = np.cross(An, R)                                                    # (N,3)
+        # 1/r^2 decay (softer than sources); you can switch to r^(3/2) if you prefer
+        invr2 = 1.0 / r2
+        contrib = (VV[:, 6] * invr2)[:, None] * cross
+        v_vor = contrib.sum(axis=0)
+        vx += float(v_vor[0]); vy += float(v_vor[1]); vz += float(v_vor[2])
+
+    # ---------------- Channels (Gaussian tubes) ----------------
+    # Each tube k: center ck, direction dk (unit), flow ~ beta * exp(-||n||^2/(2 w^2)) * exp(-(t^2)/(2 ℓ^2)) * dk
+    def add_channel(center: tuple[float, float, float],
+                    d: NDArray[np.float64],
+                    beta: float,
+                    width: float,
+                    ell: float) -> None:
+        nonlocal vx, vy, vz
+        cx, cy, cz = center
+        r = np.array([x - cx, y - cy, z - cz], dtype=np.float64)
+        d = d / (np.linalg.norm(d) + 1e-12)
+
+        t = float(np.dot(r, d))              # axial projection
+        n_vec = r - t * d                    # normal component to the tube axis
+        n2 = float(np.dot(n_vec, n_vec))
+
+        gN = float(np.exp(-n2 / (2.0 * width * width)))
+        gT = float(np.exp(-(t * t) / (2.0 * ell * ell)))
+        s = beta * gN * gT
+        vx += s * float(d[0]); vy += s * float(d[1]); vz += s * float(d[2])
+
+    # Define a couple of tubes
+    add_channel(center=(-3.0, 0.0, 0.0), d=np.array([1.0, 0.0, 0.1]), beta=0.9, width=0.8, ell=5)   # slightly rising x-directed river
+    add_channel(center=( 0.0,-2.0, 1.0), d=np.array([0.7, 0.7, 0.0]), beta=0.6, width=0.55, ell=3.2)  # NE tube in x–y
+
+    return np.array([vx, vy, vz], dtype=np.float64)
 
 # ---------------------------------------------------------------------
 
@@ -198,15 +291,15 @@ def f8_dynamics(time: float) -> NDArray[np.float64]:
     """
 
     # In-plane figure-8 (Lissajous-style)
-    A: float     = 2.0         # Amplitude in x-direction
-    B: float     = 3.0           # Amplitude in y-direction
+    A: float     = 25      # Amplitude in x-direction
+    B: float     = 15      # Amplitude in y-direction
     a: float     = 1.0           # Frequency in x-direction
     b: float     = 2.0           # Frequency in y-direction
     delta: float = np.pi / 2.0   # Phase shift (x)
 
     # Vertical oscillation parameters
-    C: float       = 3        # Amplitude in z-direction
-    c: float       = 5         # Frequency in z-direction
+    C: float       = 15# Amplitude in z-direction
+    c: float       = 1         # Frequency in z-direction
     delta_z: float = 0         # Phase shift (z)
 
     xdot: float = A * a * np.cos(a * time + delta)
@@ -229,7 +322,8 @@ def get_dynamics_function(dynamics_type: str) -> Callable[[NDArray[np.float64]],
         "chua": chua,
         "trophic_dynamics": trophic_dynamics,
         "custom": custom,
-        "current": current_dynamics,     # new current flow field
+        "current_agent": current_dynamics_agent,     # new current flow field
+        "current_target": current_dynamics_target,     # new current flow field
         "f8_dynamics": f8_dynamics,      # figure-8 with z oscillation
         "none": none,
     }
@@ -244,8 +338,12 @@ def get_initial_conditions(dynamics_type: str) -> List[float]:
         "chua": [0.2, 0.0, 0.0],                  # unitless
         "trophic_dynamics": [40.0, 9.0, 2.0],     # individuals
         "custom": [0.0, 0.0, 0.0],
-        "current": [0.0, 0.0, 0.0],               # position (x,y,z); z unused by flow
+        "current_agent": [0.0, 0.0, 0.0],               # position (x,y,z); z unused by flow
+        "current_target": [0.0, 0.0, 0.0],
         "f8_dynamics": [0.0, 0.0, 0.0],           # position placeholder if needed
         "none": [0.0, 0.0, 0.0],
     }
+    # print initial_conditions_map of current_agent and current_target
+    print("Initial conditions for current_agent:", initial_conditions_map["current_agent"])
+    print("Initial conditions for current_target:", initial_conditions_map["current_target"])
     return initial_conditions_map[dynamics_type]

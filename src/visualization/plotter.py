@@ -109,6 +109,12 @@ def plot_from_csv() -> None:
     axis_traj.legend(loc='best', fontsize=12, frameon=True, edgecolor='black')
     plt.tight_layout()
 
+
+
+
+
+    
+
     plt.show()
 
 def results() -> None:
