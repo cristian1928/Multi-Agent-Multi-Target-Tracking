@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 import itertools
 import json
@@ -237,14 +238,6 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
     target_specs = build_entity_specs(base_config, section_key="targets")
     agent_specs  = build_entity_specs(base_config, section_key="agents")
 
-     # === DEBUG === imprimir exactamente lo que pediste (y un poco más útil)
-    print("\n[DEBUG] Configs fusionadas de TARGETS (como entran a Target(...))")
-    for pos, conf in target_specs:
-        print(
-            f"Target {conf.get('id')}: is_centroid={conf.get('is_centroid', False)}, "
-            f"tracking_type={conf.get('tracking_type')}, dynamics_type={conf.get('dynamics_type')}"
-        )
-
     nd_targets = int(target_specs[0][1]['num_states'])
 
     nd_agents  = int(agent_specs[0][1]['num_states'])
@@ -361,31 +354,31 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
 
 # ---------------------------------------------------------------
 
- # ---------------------------------------------------------------
-    # SNAPSHOTS (2D): show only positions at t=0, T/2, T_f (no trajectories)
-    # ---------------------------------------------------------------
-
     t0 = 0
-    tm = time_steps // 2
+    tm = time_steps // 2   # still unused
     tf = time_steps - 1
 
-    def _plot_snapshot_3d(step: int, title: str):  # keep name to avoid changing call sites
+    def _plot_snapshots_2d_subplots():
         import numpy as _np
         from matplotlib.lines import Line2D
-        fig, ax = plt.subplots(figsize=(8, 7))
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6), constrained_layout=False)
 
         # ---------- COLOR SCHEME ----------
         colors = {
-            "square": 'tab:blue',                      # formation color for square agents
-            "tris":   ['tab:purple', 'tab:green', 'tab:orange', 'tab:brown'],  # per-triangle formation color
-            "tt_link": 'tab:red',                      # target-to-target links
-            "at_link": 'tab:cyan',                     # agent-to-target links
-            "inter_form_link": 'tab:olive'             # cross-formation agent-agent links
+            "square": 'tab:blue',
+            "tris":   ['tab:purple', 'tab:green', 'tab:orange', 'tab:brown'],
+            "tt_link": 'tab:red',
+            "at_link": 'tab:cyan',
+            "inter_form_link": 'tab:olive'
         }
+
+        # One distinct color per agent (tab20 cycles)
+        tab20 = plt.get_cmap('tab20').colors
+        agent_colors = {i: tab20[i % len(tab20)] for i in range(len(agents))}
         link_alpha = 0.95
 
-        # helper for 2D lines
-        def _line2d(p, q, c, lw=1.8, a=link_alpha, ls='-'):
+        # Helper for 2D lines
+        def _line2d(ax, p, q, c, lw=1.8, a=link_alpha, ls='-'):
             ax.plot([p[0], q[0]], [p[1], q[1]],
                     linestyle=ls, color=c, alpha=a, linewidth=lw, zorder=8)
 
@@ -399,147 +392,147 @@ def run_simulation_from_configs(configs: list[dict[str, Any]]) -> None:
                 for idx in g:
                     agent_label[idx] = f'tri{k}'
 
-        # Current XY positions
-        T_now = [tg.positions[:2, step] for tg in targets] if targets else []
-        A_now = [ag.positions[:2, step] for ag in agents]  if agents  else []
+        # Steps to render
+        steps = [t0, tf]
 
-        # ---------- SCATTER TARGETS (points only) ----------
-        # Plotted as red markers for readability (legend gives distinct colors per target name)
-        if targets:
-            for j, p in enumerate(T_now):
-                ax.scatter(p[0], p[1], s=90, marker='X', color='red',
-                        edgecolor='k', linewidth=0.7, zorder=7)
+        # ---------- Compute global limits across both steps ----------
+        all_pts = []
+        for step in steps:
+            if targets:
+                for tg in targets:
+                    all_pts.append(tg.positions[:2, step])
+            if agents:
+                for ag in agents:
+                    all_pts.append(ag.positions[:2, step])
 
-        # ---------- SCATTER AGENTS (points only, formation colors) ----------
-        if 'square_group' in locals() and square_group:
-            col = colors["square"]
-            for i in square_group:
-                p = A_now[i]
-                ax.scatter(p[0], p[1], s=70, marker='o', color=col,
-                        edgecolor='k', linewidth=0.6, zorder=6)
+        if all_pts:
+            P = _np.vstack([p.reshape(1, 2) for p in all_pts])
+            mins = P.min(axis=0); maxs = P.max(axis=0)
+            span = _np.maximum(maxs - mins, 1e-9)
+            pad = 0.10 * float(_np.max(span))
+            xlim = (mins[0] - pad, maxs[0] + pad)
+            ylim = (mins[1] - pad, maxs[1] + pad)
+        else:
+            xlim = (-1, 1); ylim = (-1, 1)
 
-        if 'tri_groups' in locals() and tri_groups:
-            for gi, g in enumerate(tri_groups):
-                col = colors["tris"][gi % len(colors["tris"])]
-                for i in g:
+        # ---------- Draw each subplot ----------
+        for ax, step in zip(axes, steps):
+            # Current XY positions
+            T_now = [tg.positions[:2, step] for tg in targets] if targets else []
+            A_now = [ag.positions[:2, step] for ag in agents]  if agents  else []
+
+            # Targets (points only)
+            if targets:
+                for p in T_now:
+                    ax.scatter(p[0], p[1], s=90, marker='X', color='red',
+                            edgecolor='k', linewidth=0.7, zorder=7)
+
+            # Agents (points only, per-agent colors)
+            if 'square_group' in locals() and square_group:
+                for i in square_group:
                     p = A_now[i]
-                    ax.scatter(p[0], p[1], s=65, marker='o', color=col,
+                    ax.scatter(p[0], p[1], s=70, marker='o',
+                            color=agent_colors[i],
                             edgecolor='k', linewidth=0.6, zorder=6)
-
-        # ---------- LINKS ----------
-        # Target↔Target (one color)
-        if targets and "target_edge_set" in base_config:
-            for i, j in base_config["target_edge_set"]:
-                i0, j0 = i - 1, j - 1
-                if 0 <= i0 < len(T_now) and 0 <= j0 < len(T_now):
-                    _line2d(T_now[i0], T_now[j0], colors["tt_link"], lw=2.2)
-
-        # Agent→Target (pinning) (one color)
-        if agents and targets:
-            for i, ag in enumerate(agents):
-                if getattr(ag, "pin_row", _np.zeros(0)).size:
-                    for t_idx, w in enumerate(ag.pin_row):
-                        if w != 0.0 and 0 <= t_idx < len(T_now):
-                            _line2d(A_now[i], T_now[t_idx], colors["at_link"], lw=1.8)
-
-        # Intra-formation Agent↔Agent (formation color)
-        if agents:
-            # Triangles
             if 'tri_groups' in locals() and tri_groups:
                 for gi, g in enumerate(tri_groups):
-                    col = colors["tris"][gi % len(colors["tris"])]
                     for i in g:
+                        p = A_now[i]
+                        ax.scatter(p[0], p[1], s=65, marker='o',
+                                color=agent_colors[i],
+                                edgecolor='k', linewidth=0.6, zorder=6)
+
+            # Target↔Target links
+            if targets and "target_edge_set" in base_config:
+                for i, j in base_config["target_edge_set"]:
+                    i0, j0 = i - 1, j - 1
+                    if 0 <= i0 < len(T_now) and 0 <= j0 < len(T_now):
+                        _line2d(ax, T_now[i0], T_now[j0], colors["tt_link"], lw=2.2)
+
+            # Agent→Target (pinning)
+            if agents and targets:
+                for i, ag in enumerate(agents):
+                    row = getattr(ag, "pin_row", _np.zeros(0))
+                    if row.size:
+                        for t_idx, w in enumerate(row):
+                            if w != 0.0 and 0 <= t_idx < len(T_now):
+                                _line2d(ax, A_now[i], T_now[t_idx], colors["at_link"], lw=1.8)
+
+            # Intra-formation Agent↔Agent
+            if agents:
+                # Triangles
+                if 'tri_groups' in locals() and tri_groups:
+                    for gi, g in enumerate(tri_groups):
+                        col = colors["tris"][gi % len(colors["tris"])]
+                        for i in g:
+                            for nb in agents[i].neighbors:
+                                try:
+                                    j = agents.index(nb)
+                                except ValueError:
+                                    continue
+                                if j <= i or j not in g:
+                                    continue
+                                _line2d(ax, A_now[i], A_now[j], col, lw=1.8)
+                # Square
+                if 'square_group' in locals() and square_group:
+                    col = colors["square"]
+                    for i in square_group:
                         for nb in agents[i].neighbors:
                             try:
                                 j = agents.index(nb)
                             except ValueError:
                                 continue
-                            if j <= i or j not in g:
+                            if j <= i or j not in square_group:
                                 continue
-                            _line2d(A_now[i], A_now[j], col, lw=1.8)
-            # Square
-            if 'square_group' in locals() and square_group:
-                col = colors["square"]
-                for i in square_group:
-                    for nb in agents[i].neighbors:
+                            _line2d(ax, A_now[i], A_now[j], col, lw=1.8)
+
+            # Cross-formation Agent↔Agent
+            if agents:
+                for i, ag in enumerate(agents):
+                    for nb in ag.neighbors:
                         try:
                             j = agents.index(nb)
                         except ValueError:
                             continue
-                        if j <= i or j not in square_group:
+                        if j <= i:
                             continue
-                        _line2d(A_now[i], A_now[j], col, lw=1.8)
+                        li = agent_label.get(i, None); lj = agent_label.get(j, None)
+                        if li is not None and lj is not None and li != lj:
+                            _line2d(ax, A_now[i], A_now[j], colors["inter_form_link"], lw=1.6)
 
-        # Cross-formation Agent↔Agent (neutral color)
-        if agents:
-            for i, ag in enumerate(agents):
-                for nb in ag.neighbors:
-                    try:
-                        j = agents.index(nb)
-                    except ValueError:
-                        continue
-                    if j <= i:
-                        continue
-                    li = agent_label.get(i, None); lj = agent_label.get(j, None)
-                    if li is not None and lj is not None and li != lj:
-                        _line2d(A_now[i], A_now[j], colors["inter_form_link"], lw=1.6)
-
-        # Agent edge set (dashed black)
-        if agents and "agent_edge_set" in base_config:
-            for i, j in base_config["agent_edge_set"]:
-                i0, j0 = i - 1, j - 1
-                if 0 <= i0 < len(A_now) and 0 <= j0 < len(A_now):
-                    _line2d(A_now[i0], A_now[j0], 'black', lw=1.6, a=0.85, ls='--')
-
-        # ---------- AUTO LIMITS (2D) ----------
-        XY_chunks = []
-        for p in T_now:
-            XY_chunks.append(p.reshape(1, 2))
-        for p in A_now:
-            XY_chunks.append(p.reshape(1, 2))
-        if XY_chunks:
-            P = _np.vstack(XY_chunks)  # (M, 2)
-            mins = P.min(axis=0); maxs = P.max(axis=0)
-            span = _np.maximum(maxs - mins, 1e-9)
-            pad = 0.10 * float(_np.max(span))
-            ax.set_xlim(mins[0] - pad, maxs[0] + pad)
-            ax.set_ylim(mins[1] - pad, maxs[1] + pad)
+            # Axis limits & style (no titles, no per-axes legends)
+            ax.set_xlim(*xlim); ax.set_ylim(*ylim)
             ax.set_aspect('equal', 'box')
+            ax.set_xlabel("X"); ax.set_ylabel("Y")
+            ax.grid(True)
 
-        # ---------- LEGEND (distinct entries per agent & target) ----------
-        # Use tab20 for legend colors (legend-only; plotted markers keep formation colors)
-        tab20 = plt.get_cmap('tab20').colors
-        A_leg_colors = [tab20[i % 20] for i in range(len(agents))]
-        T_leg_colors = [tab20[(i + len(agents)) % 20] for i in range(len(targets))]
+        # ---------- Figure-level legend at bottom (four link types only) ----------
+        # Representative color for "within formation" (use square color as exemplar)
+        within_form_color = colors["square"]
 
-        legend_handles: list[Line2D] = []
-        # Agents
-        for i, ag in enumerate(agents):
-            legend_handles.append(Line2D([0],[0], color=A_leg_colors[i], lw=2.0, label=f'Agent {ag.id}'))
-        # Targets
-        for i, tg in enumerate(targets):
-            legend_handles.append(Line2D([0],[0], color=T_leg_colors[i], lw=2.0, label=f'Target {tg.id}'))
-        # Link types
-        legend_handles.extend([
-            Line2D([0],[0], color=colors["tt_link"], lw=2.2, label='Target–Target link'),
-            Line2D([0],[0], color=colors["at_link"], lw=1.8, label='Agent→Target link'),
-            Line2D([0],[0], color=colors["inter_form_link"], lw=1.6, label='Cross-formation A–A link'),
-            Line2D([0],[0], color='black', lw=1.6, ls='--', label='Agent–Agent edge'),
-        ])
-        ax.legend(handles=legend_handles, loc='upper left', bbox_to_anchor=(1.02, 1),
-                frameon=True, fontsize='small')
+        legend_handles = [
+            Line2D([0], [0], color=colors["tt_link"],   lw=2.2, label='Target–Target connection'),
+            Line2D([0], [0], color=colors["at_link"],   lw=1.8, label='Agent→Target connection'),
+            Line2D([0], [0], color=within_form_color,   lw=1.8, label='Agent–Agent (within formation)'),
+            Line2D([0], [0], color=colors["inter_form_link"], lw=1.6, label='Agent–Agent (out of formation)'),
+        ]
 
-        # ---------- AXIS DECOR ----------
-        ax.set_title(title)
-        ax.set_xlabel("X"); ax.set_ylabel("Y")
-        ax.grid(True)
-        plt.tight_layout()
+        fig.legend(
+            handles=legend_handles,
+            loc='lower center',
+            ncol=2,
+            frameon=True,
+            fontsize='small',
+            bbox_to_anchor=(0.5, -0.02)  # slightly below the subplots
+        )
+        # Make room for the bottom legend
+        fig.subplots_adjust(bottom=0.18)
+
         plt.show(block=False)
 
-    # Call snapshots (no changes needed elsewhere)
-    _plot_snapshot_3d(t0, f"Snapshot t=0 (step {t0})")
-    _plot_snapshot_3d(tm, f"Snapshot t=T/2 (step {tm})")
-    _plot_snapshot_3d(tf, f"Snapshot t=Tf (step {tf})")
+    # Call once (two subplots: t=0 and t=Tf, with bottom legend)
+    _plot_snapshots_2d_subplots()
+
 
 
 # ---------------------------------------------------------------

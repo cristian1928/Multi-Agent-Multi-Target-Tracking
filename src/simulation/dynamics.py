@@ -216,6 +216,7 @@ def current_dynamics_target(state: NDArray[np.float64]) -> NDArray[np.float64]:
 
     # ---------------- Sources / Sinks (3D) ----------------SS
     # columns: [px, py, pz, alpha]; alpha>0 = source, alpha<0 = sink
+    
     SS = np.array([
         [-2.0,  1.0,  0.8, +1.2],
         [ 1.6, -1.2, -0.5, -1.0],
