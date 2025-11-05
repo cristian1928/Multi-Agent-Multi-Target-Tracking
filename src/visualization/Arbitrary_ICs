@@ -10,7 +10,7 @@ out_dir = Path('runs/flow_simulation_data/ic_xy_data')
 out_dir.mkdir(parents=True, exist_ok=True)
 
 # Change this to the number of files you want created (1..n)
-n = 2
+n = 6
 
 # create numbered files (A1_state_data_1.csv ... A1_state_data_n.csv) if missing
 for i in range(1, n + 1):
