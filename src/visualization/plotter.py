@@ -128,6 +128,7 @@ def plot_from_csv() -> None:
             handle = Line2D([0], [0], color=color, lw=1.5)
             legend_handles.append(handle)
 
+        plt.yscale('log')
         axis_error.set_xlabel('Time (s)')
         axis_error.set_ylabel('Synchronization Error Norm $\| \eta \|$ $(m)$')
 
@@ -136,8 +137,8 @@ def plot_from_csv() -> None:
             try:
                 tmax = float(time_values.max())
             except Exception:
-                tmax = 1.0
-            axis_error.set_xlim(0.0, min(1.0, tmax))
+                tmax = 10
+            axis_error.set_xlim(0.0, min(10, tmax))
 
         # use the explicit handles so legend colors match the plotted colors
         axis_error.legend(handles=legend_handles,
