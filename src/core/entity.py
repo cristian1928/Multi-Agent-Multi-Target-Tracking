@@ -91,4 +91,4 @@ class Target(Entity):
                 neighborhood_consensus_term += neighbor_total - self_total
 
         self.synchronization_error = neighborhood_consensus_term
-        self.control_output = self.k1 * self.synchronization_error/100 + desired_velocity
+        self.control_output = self.k1 * self.synchronization_error + desired_velocity

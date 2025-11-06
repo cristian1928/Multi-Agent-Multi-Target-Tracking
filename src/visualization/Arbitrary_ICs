@@ -10,31 +10,34 @@ out_dir = Path('runs/flow_simulation_data/ic_xy_data')
 out_dir.mkdir(parents=True, exist_ok=True)
 
 # Change this to the number of files you want created (1..n)
-n = 6
+n = 1
 
 # create numbered files (A1_state_data_1.csv ... A1_state_data_n.csv) if missing
 for i in range(1, n + 1):
     print(i)
     p = data_dir / f'ic_{i}/simulation_data/agent_data/A1_state_data.csv'
+    print(p)
     # ex: p = Path('runs/k_1/simulation_data/agent_data/A1_state_data_1.csv')
     if not p.exists():
-        p.write_text('Position X,Position Y\n')
+        p.write_text('Time,Position X,Position Y\n')
         # this is where the code that actually writes data into the files goes.
     # collect matching files and read them
     # create two lists to hold x and y data
 
     # print [1] and [2] from 'X_position' and 'Y_position' columns from csv file
+    time_data = []
     x_data = []
     y_data = []
     print(p)
     # append [1] and [2] to x_data and y_data from csv file
 
-    print('x:', x_data)
+    # print('x:', x_data)
     # create new file in path runs/flow_simulation_data
     # for csv_file in p:
     df = pd.read_csv(p)
     # collect Position X/Y from the dataframe (if present)
-    if 'Position X' in df.columns and 'Position Y' in df.columns:
+    if 'Time' in df.columns and 'Position X' in df.columns and 'Position Y' in df.columns:
+        time_data.extend(df['Time'].tolist())
         x_data.extend(df['Position X'].tolist())
         y_data.extend(df['Position Y'].tolist())
     else:
@@ -44,9 +47,9 @@ for i in range(1, n + 1):
     out_path = out_dir / f'A1_state_data_{i}.csv'
     # write header and rows (two columns)
     with out_path.open('w') as f:
-        f.write('Position X,Position Y\n')
-        for x, y in zip(x_data, y_data):
-            f.write(f"{x},{y}\n")
+        f.write('Time,Position X,Position Y\n')
+        for t, x, y in zip(time_data, x_data, y_data):
+            f.write(f"{t},{x},{y}\n")
 
 # A1_x = A1_state_data["Position X"]
 # A1_y = A1_state_data["Position Y"]

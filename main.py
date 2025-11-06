@@ -99,7 +99,7 @@ def make_offsets_agents_triangle(agent_specs: list[tuple[np.ndarray, dict]],
 
     target_pos = target_specs[target_index][0]
     agent_positions = np.array([spec[0] for spec in agent_specs])
-    l = np.linalg.norm(agent_positions[1] - agent_positions[0])
+    l = 20
 
     # define ideal triangle formation (equilateral)
     tri_formation = [
@@ -138,7 +138,7 @@ def make_offsets_agents_square(agent_specs: list[tuple[np.ndarray, dict]],
 
     target_pos = target_specs[target_index][0]
     agent_positions = np.array([spec[0] for spec in agent_specs])
-    l = np.linalg.norm(agent_positions[1] - agent_positions[0])
+    l = 20
 
     # ideal vertex positions (square of side l, centered at target)
     square_formation = [
@@ -185,7 +185,7 @@ def make_offsets_targets(target_specs: list[tuple[np.ndarray, dict]],
         target_positions = np.array([spec[0] for spec in target_specs])
 
         # --- Geometry of tetrahedron (local coordinates) ---
-        d = np.linalg.norm(target_positions[1] - target_positions[0])
+        d = 15
         h = np.sqrt(6) * d / 3
 
         tet_formation = [
